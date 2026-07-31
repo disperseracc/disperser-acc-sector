@@ -11,8 +11,9 @@ import { BASE_URL } from '@/api/api';
 import { useConfigStore } from '@/store/useConfigStore';
 
 export default function Settings() {
-  const { setConfig } = useConfigStore();
+  const { setConfig, uploadTarget, setUploadTarget } = useConfigStore();
   const [userId, setUserId] = useState(localStorage.getItem('disperser_user_id') || '');
+  const [groupId, setGroupId] = useState(localStorage.getItem('disperser_group_id') || '');
   const [apiKey, setApiKey] = useState(localStorage.getItem('disperser_key') || '');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -30,7 +31,7 @@ export default function Settings() {
 
       const { data, error } = await supabase
         .from('users')
-        .select('roblox_user_id, roblox_api_key')
+        .select('roblox_user_id, roblox_group_id, roblox_api_key')
         .eq('id', id)
         .single();
 
@@ -38,6 +39,10 @@ export default function Settings() {
         if (data.roblox_user_id) {
           setUserId(data.roblox_user_id);
           localStorage.setItem('disperser_user_id', data.roblox_user_id);
+        }
+        if (data.roblox_group_id) {
+          setGroupId(data.roblox_group_id);
+          localStorage.setItem('disperser_group_id', data.roblox_group_id);
         }
         if (data.roblox_api_key) {
           setApiKey(data.roblox_api_key);
@@ -81,22 +86,28 @@ export default function Settings() {
       }
 
       // 2. Update Supabase
+      const updatePayload: any = {
+        roblox_user_id: userId,
+        roblox_api_key: apiKey
+      };
+      if (groupId !== undefined) updatePayload.roblox_group_id = groupId;
+
       const { error } = await supabase
         .from('users')
-        .update({
-          roblox_user_id: userId,
-          roblox_api_key: apiKey
-        })
+        .update(updatePayload)
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.warn('Supabase update warning (roblox_group_id column might not exist):', error.message);
+      }
 
       // Update LocalStorage for quick access in API calls
       localStorage.setItem('disperser_user_id', userId);
+      localStorage.setItem('disperser_group_id', groupId);
       localStorage.setItem('disperser_key', apiKey);
-      
+
       // Update global context state
-      setConfig(userId, apiKey);
+      setConfig(userId, groupId, apiKey);
 
       setSaved(true);
       setStatus('success');
@@ -149,6 +160,57 @@ export default function Settings() {
                   />
                   <p className="text-[11px] text-slate-500">Your unique Roblox numeric ID (can be found in your profile URL).</p>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="groupId" className="text-slate-300 flex items-center gap-2">
+                    <Users size={14} /> Roblox Group ID <span className="text-xs text-slate-500 font-normal">(Optional)</span>
+                  </Label>
+                  <Input
+                    id="groupId"
+                    placeholder="e.g. 98765432"
+                    value={groupId}
+                    onChange={(e) => setGroupId(e.target.value)}
+                    className="bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus-visible:ring-cyan-500/50"
+                  />
+                  <p className="text-[11px] text-slate-500">Pilih/Isi ini jika API Key kamu dikonfigurasi untuk Group. Audio akan langsung terhubung ke Group ini saat diupload.</p>
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <Label className="text-slate-300 flex items-center gap-2">
+                  <Users size={14} /> Mode Default Target Upload
+                </Label>
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setUploadTarget('user')}
+                    className={`p-3 rounded-xl border text-left transition-all flex items-start gap-3 ${uploadTarget === 'user'
+                        ? 'bg-cyan-500/10 border-cyan-500/50 text-white ring-1 ring-cyan-500/30'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                  >
+                    <User size={18} className={uploadTarget === 'user' ? 'text-cyan-400 mt-0.5' : 'text-slate-500 mt-0.5'} />
+                    <div>
+                      <div className="text-xs font-bold">Personal Account</div>
+                      <div className="text-[10px] text-slate-500">Upload atas nama User ID</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setUploadTarget('group')}
+                    className={`p-3 rounded-xl border text-left transition-all flex items-start gap-3 ${uploadTarget === 'group'
+                        ? 'bg-cyan-500/10 border-cyan-500/50 text-white ring-1 ring-cyan-500/30'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                  >
+                    <Users size={18} className={uploadTarget === 'group' ? 'text-cyan-400 mt-0.5' : 'text-slate-500 mt-0.5'} />
+                    <div>
+                      <div className="text-xs font-bold">Roblox Group</div>
+                      <div className="text-[10px] text-slate-500">Upload atas nama Group ID</div>
+                    </div>
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -168,8 +230,8 @@ export default function Settings() {
 
               {status !== 'idle' && (
                 <div className={`p-4 rounded-xl border animate-in fade-in slide-in-from-top-2 duration-300 ${status === 'success'
-                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                    : 'bg-red-500/10 border-red-500/20 text-red-400'
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                  : 'bg-red-500/10 border-red-500/20 text-red-400'
                   }`}>
                   <div className="flex items-center gap-2 text-xs font-bold">
                     {status === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}

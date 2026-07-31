@@ -27,7 +27,9 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckSquare,
-  X
+  X,
+  User,
+  Users
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
@@ -51,7 +53,7 @@ export default function AudioLibrary() {
   const currentRole = user.current_role || 'Free';
 
   const { items, loading, updateItemLocal, logs, addLog, clearLogs } = useAppStore();
-  const { hasConfig, loadingConfig } = useConfigStore();
+  const { hasConfig, loadingConfig, userId, groupId, uploadTarget, setUploadTarget } = useConfigStore();
   const { startPoll, refresh } = usePollContext();
   const [search, setSearch] = useState('');
   const [uploadingIds, setUploadingIds] = useState<Set<string>>(new Set());
@@ -96,15 +98,15 @@ export default function AudioLibrary() {
     setUploadingIds(prev => new Set(prev).add(id));
     await api.updateItem(id, { status: 'uploading', errorMessage: null });
     updateItemLocal(id, { status: 'uploading', errorMessage: null });
-    addLog(`[Item:${id}] Starting upload process for "${item.name}"...`, 'info');
+    addLog(`[Item:${id}] Starting upload process for "${item.name}"... (Target: ${uploadTarget.toUpperCase()})`, 'info');
 
     try {
       addLog(`[Item:${id}] Preparing secure transfer...`, 'info');
       const signedUrl = await api.getSignedUrl(id);
       if (!signedUrl) throw new Error('Failed to generate source link');
 
-      addLog(`[Item:${id}] Uploading to Roblox (Server-side stream)...`, 'info');
-      const res = await api.robloxUploadFromUrl(item.name, item.description || 'Uploaded via Disperser Studio', signedUrl);
+      addLog(`[Item:${id}] Uploading to Roblox as ${uploadTarget === 'group' ? 'Group' : 'User'} asset...`, 'info');
+      const res = await api.robloxUploadFromUrl(item.name, item.description || 'Uploaded via Disperser Studio', signedUrl, uploadTarget);
 
       if (res.success && res.operation?.path) {
         addLog(`[Item:${id}] Upload successful! Operation Path: ${res.operation.path}`, 'success');
@@ -259,7 +261,35 @@ export default function AudioLibrary() {
             <p className="text-sm text-slate-500">Manage and track your audio library.</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 shrink-0">
+              <span className="text-[11px] text-slate-500 font-medium px-2 hidden sm:inline">Target Upload:</span>
+              <button
+                type="button"
+                onClick={() => setUploadTarget('user')}
+                title={userId ? `Upload to Personal (ID: ${userId})` : 'User ID belum diatur'}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${uploadTarget === 'user'
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                  }`}
+              >
+                <User size={12} />
+                <span>Personal</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setUploadTarget('group')}
+                title={groupId ? `Upload to Group (ID: ${groupId})` : 'Group ID belum diatur'}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${uploadTarget === 'group'
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                  }`}
+              >
+                <Users size={12} />
+                <span>Group</span>
+              </button>
+            </div>
+
             <div className="relative flex-1 md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
               <Input
@@ -283,7 +313,7 @@ export default function AudioLibrary() {
                 <TableHead className="w-12 px-4">
                   <Checkbox
                     checked={
-                      paginatedItems.length > 0 && 
+                      paginatedItems.length > 0 &&
                       paginatedItems.filter(i => i.status === 'pending' || i.status === 'error').length > 0 &&
                       paginatedItems.filter(i => i.status === 'pending' || i.status === 'error').every(i => selectedIds.has(i.id))
                     }

@@ -7,7 +7,7 @@ const getCurrentUserId = () => {
   try {
     const userStr = localStorage.getItem('disperser_user');
     if (userStr) return JSON.parse(userStr).id;
-  } catch (e) {}
+  } catch (e) { }
   return null;
 };
 
@@ -56,12 +56,12 @@ export const api = {
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
-        
+
       if (error) {
         console.error('Supabase fetch error:', error);
         return [];
       }
-      
+
       return data.map(item => ({
         ...item,
         createdAt: item.created_at,
@@ -83,7 +83,7 @@ export const api = {
     const ext = isMp3 ? '.mp3' : (isOgg && !isWavBlob ? '.ogg' : '.wav');
     const contentType = isMp3 ? 'audio/mpeg' : (isOgg && !isWavBlob ? 'audio/ogg' : 'audio/wav');
     const filePath = `audio_${id}${ext}`;
-    
+
     // Upload file to Supabase Storage
     const { error: uploadError } = await supabase.storage
       .from('audios')
@@ -98,24 +98,24 @@ export const api = {
     }
 
     // Insert metadata to Supabase DB
-    const item = { 
-      id, 
-      name, 
-      description, 
-      status: 'pending', 
+    const item = {
+      id,
+      name,
+      description,
+      status: 'pending',
       file_path: filePath,
       user_id: getCurrentUserId()
     };
-    
+
     const { error: dbError } = await supabase
       .from('audio_library')
       .insert([item]);
-      
+
     if (dbError) {
       console.error('Supabase DB insert error:', dbError);
       throw dbError;
     }
-    
+
     return { ...item, createdAt: Date.now() }; // approximate createdAt for immediate UI usage
   },
 
@@ -124,7 +124,7 @@ export const api = {
     if (data.assetId !== undefined) updatePayload.asset_id = data.assetId;
     if (data.operationPath !== undefined) updatePayload.operation_path = data.operationPath;
     if (data.errorMessage !== undefined) updatePayload.error_message = data.errorMessage;
-    
+
     delete updatePayload.assetId;
     delete updatePayload.operationPath;
     delete updatePayload.errorMessage;
@@ -135,7 +135,7 @@ export const api = {
       .update(updatePayload)
       .eq('id', id)
       .eq('user_id', getCurrentUserId());
-      
+
     if (error) console.error('Supabase DB update error:', error);
   },
 
@@ -147,12 +147,12 @@ export const api = {
       .eq('id', id)
       .eq('user_id', getCurrentUserId())
       .single();
-      
+
     // 2. Delete from storage if exists
     if (item?.file_path) {
       await supabase.storage.from('audios').remove([item.file_path]);
     }
-    
+
     // 3. Delete from DB
     await supabase.from('audio_library').delete().eq('id', id).eq('user_id', getCurrentUserId());
   },
@@ -164,7 +164,7 @@ export const api = {
       .eq('id', id)
       .eq('user_id', getCurrentUserId())
       .single();
-      
+
     if (item?.file_path) {
       await supabase.storage.from('audios').remove([item.file_path]);
       await supabase.from('audio_library').update({ file_path: null }).eq('id', id).eq('user_id', getCurrentUserId());
@@ -178,7 +178,7 @@ export const api = {
       .eq('id', id)
       .eq('user_id', getCurrentUserId())
       .single();
-      
+
     if (!item?.file_path) return null;
     const { data: urlData, error: urlError } = await supabase.storage
       .from('audios')
@@ -206,7 +206,7 @@ export const api = {
       .eq('id', id)
       .eq('user_id', getCurrentUserId())
       .single();
-      
+
     if (!item?.file_path) return null;
 
     const { data, error } = await supabase.storage
@@ -237,13 +237,17 @@ export const api = {
     return { title, buffer: new Uint8Array(buffer) };
   },
 
-  async robloxUpload(name: string, desc: string, audioBlob: Blob) {
+  async robloxUpload(name: string, desc: string, audioBlob: Blob, uploadTarget?: 'user' | 'group') {
     const key = localStorage.getItem('disperser_key');
     const userId = localStorage.getItem('disperser_user_id'); // Roblox Creator ID
+    const groupId = localStorage.getItem('disperser_group_id');
+    const target = uploadTarget || localStorage.getItem('disperser_upload_target') || 'user';
     const sbUserId = getCurrentUserId();
     const form = new FormData();
     form.append('apiKey', key || '');
     form.append('userId', userId || '');
+    if (groupId) form.append('groupId', groupId);
+    form.append('uploadTarget', target);
     form.append('supabaseUserId', sbUserId || '');
     form.append('name', name);
     form.append('description', desc);
@@ -253,42 +257,58 @@ export const api = {
       method: 'POST',
       body: form
     });
-    return await res.json();
+    const text = await res.text();
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      throw new Error(`Server returned non-JSON response (${res.status}): ${text.substring(0, 150)}`);
+    }
+    if (!res.ok) {
+      throw new Error(data.error || data.message || `Upload failed (${res.status})`);
+    }
+    return data;
   },
 
-  async robloxUploadFromUrl(name: string, desc: string, fileUrl: string) {
+  async robloxUploadFromUrl(name: string, desc: string, fileUrl: string, uploadTarget?: 'user' | 'group') {
     const apiKey = localStorage.getItem('disperser_key');
     const userId = localStorage.getItem('disperser_user_id'); // Roblox Creator ID
+    const groupId = localStorage.getItem('disperser_group_id');
+    const target = uploadTarget || localStorage.getItem('disperser_upload_target') || 'user';
     const sbUserId = getCurrentUserId();
-    
+
     const res = await fetch(`${BASE_URL}/api/roblox/upload-from-url`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         apiKey,
         userId,
+        groupId,
+        uploadTarget: target,
         supabaseUserId: sbUserId,
         name,
         description: desc,
         fileUrl
       })
     });
-    
-    if (!res.ok) {
-      const text = await res.text();
-      let msg = `Server Error (${res.status})`;
-      try {
-        const json = JSON.parse(text);
-        msg = json.error || json.message || msg;
-      } catch (e) {
-        if (text.includes('<!DOCTYPE html>')) {
-          msg = "Backend route not found (404). Please ensure the backend is restarted with the latest changes.";
-        }
+
+    const text = await res.text();
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      let msg = `Server returned non-JSON response (${res.status})`;
+      if (text.includes('<!DOCTYPE html>') || text.includes('<html')) {
+        msg = `Server Error (${res.status}): Path not found or HTML error page returned.`;
       }
       throw new Error(msg);
     }
-    
-    return await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || data.message || `Upload failed (${res.status})`);
+    }
+
+    return data;
   },
 
   async checkOperation(opId: string) {

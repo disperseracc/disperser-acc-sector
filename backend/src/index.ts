@@ -61,43 +61,69 @@ if (process.env.YT_COOKIES) {
   console.log('⚠️ No cookie-related variables found at all!');
 }
 
-const ytConfig = {
-  executable: os.platform() === 'win32' ? 'yt-dlp' : (process.env.YT_DLP_PATH || 'yt-dlp')
+const getYtDlpExecutable = (): string => {
+  if (process.env.YT_DLP_PATH && fs.existsSync(process.env.YT_DLP_PATH)) {
+    return process.env.YT_DLP_PATH;
+  }
+  if (os.platform() === 'win32') {
+    const userProfile = process.env.USERPROFILE || 'C:\\Users\\User';
+    const userAppData = process.env.APPDATA || path.join(userProfile, 'AppData\\Roaming');
+
+    const candidates = [
+      path.join(userAppData, 'Python', 'Python314', 'Scripts', 'yt-dlp.exe'),
+      path.join(userAppData, 'Python', 'Python312', 'Scripts', 'yt-dlp.exe'),
+      path.join(userAppData, 'Python', 'Python311', 'Scripts', 'yt-dlp.exe'),
+      path.join(userAppData, 'Python', 'Python310', 'Scripts', 'yt-dlp.exe'),
+      path.join(userProfile, 'AppData', 'Local', 'Programs', 'Python', 'Python314', 'Scripts', 'yt-dlp.exe'),
+      path.join(userProfile, 'AppData', 'Local', 'Programs', 'Python', 'Python312', 'Scripts', 'yt-dlp.exe'),
+      'C:\\Python314\\Scripts\\yt-dlp.exe',
+      'C:\\Python312\\Scripts\\yt-dlp.exe',
+    ];
+
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    }
+  }
+  return 'yt-dlp';
 };
 
-// --- Persistent cookie file (written ONCE at startup, not per-request) ---
-let persistentCookiePath: string | null = null;
+const ytConfig = {
+  get executable() {
+    return getYtDlpExecutable();
+  }
+};
 
-const initCookies = (): void => {
-  const localCookies = path.resolve(__dirname, '../cookies.txt');
-
+// --- Dynamic cookie file resolver ---
+const getCookiePath = (): string | null => {
   if (process.env.YT_COOKIES) {
     const val = process.env.YT_COOKIES;
-    if (val.includes('# Netscape HTTP Cookie File') || val.includes('curl.haxx.se') || val.includes('\tTRUE\t')) {
+    if (val.includes('# Netscape HTTP Cookie File') || val.includes('curl.haxx.se') || val.includes('\tTRUE\t') || val.includes('.youtube.com')) {
       try {
         const tempPath = path.join(os.tmpdir(), `cookies-persistent.txt`);
         fs.writeFileSync(tempPath, val.replace(/\\n/g, '\n'));
-        persistentCookiePath = tempPath;
-        console.log(`🍪 Persistent cookie file written: ${tempPath}`);
+        return tempPath;
       } catch (e) {
-        console.error('Failed to write persistent cookies:', e);
+        console.error('Failed to write persistent cookies from env:', e);
       }
     }
-  } else if (fs.existsSync(localCookies)) {
-    const content = fs.readFileSync(localCookies, 'utf-8');
-    if (content.includes('# Netscape HTTP Cookie File') || content.includes('curl.haxx.se') || content.includes('\tTRUE\t')) {
-      persistentCookiePath = localCookies;
-      console.log(`🍪 Using local cookie file: ${localCookies}`);
+  }
+
+  const localCookies = path.resolve(__dirname, '../cookies.txt');
+  if (fs.existsSync(localCookies)) {
+    try {
+      const content = fs.readFileSync(localCookies, 'utf-8');
+      if (content.includes('# Netscape HTTP Cookie File') || content.includes('curl.haxx.se') || content.includes('\tTRUE\t') || content.includes('.youtube.com')) {
+        return localCookies;
+      }
+    } catch (e) {
+      console.error('Failed to read local cookies file:', e);
     }
   }
 
-  if (!persistentCookiePath) {
-    console.log('⚠️ No cookies available — some strategies will be limited');
-  }
+  return null;
 };
-
-// Initialize cookies once at startup
-initCookies();
 
 // --- Download queue to limit concurrency and avoid YouTube rate limits ---
 const MAX_CONCURRENT_DOWNLOADS = 2;
@@ -125,10 +151,11 @@ const releaseDownloadSlot = (): void => {
 
 // Build yt-dlp download strategies — tried in order until one succeeds
 const getDownloadStrategies = () => {
-  const cookiesArgs = persistentCookiePath ? ['--cookies', persistentCookiePath] : [];
+  const cookiePath = getCookiePath();
+  const cookiesArgs = cookiePath ? ['--cookies', cookiePath] : [];
   const proxyArgs = process.env.YT_PROXY ? ['--proxy', process.env.YT_PROXY] : [];
 
-  console.log(`🍪 Cookies: ${persistentCookiePath ? 'YES' : 'NO'}`);
+  console.log(`🍪 Cookies detected: ${cookiePath ? `YES (${cookiePath})` : 'NO'}`);
 
   const baseArgs = [
     '--no-check-certificates',
@@ -139,20 +166,20 @@ const getDownloadStrategies = () => {
   ];
 
   const strategies = [
-    // Strategy 1: default + cookies (let yt-dlp auto-select best client; Deno handles n-challenge)
+    // Strategy 1: android_vr (FAST & works without cookies for most public videos)
+    { name: 'android_vr', args: [...baseArgs, '--extractor-args', 'youtube:player_client=android_vr'] },
+
+    // Strategy 2: ios (WITHOUT cookies)
+    { name: 'ios', args: [...baseArgs, '--extractor-args', 'youtube:player_client=ios'] },
+
+    // Strategy 3: tv (WITHOUT cookies)
+    { name: 'tv', args: [...baseArgs, '--extractor-args', 'youtube:player_client=tv'] },
+
+    // Strategy 4: default + cookies (for age-restricted or member-only videos requiring cookies)
     ...(cookiesArgs.length ? [
       { name: 'default+cookies', args: [...baseArgs, ...cookiesArgs] },
-    ] : []),
-    // Strategy 2: mweb (lightweight, works without cookies)
-    { name: 'mweb', args: [...baseArgs, '--extractor-args', 'youtube:player_client=mweb'] },
-    // Strategy 3: android_vr (no cookies needed, different fingerprint)
-    { name: 'android_vr', args: [...baseArgs, '--extractor-args', 'youtube:player_client=android_vr'] },
-    // Strategy 4: web_creator + cookies (needs PO token; bgutil plugin handles it)
-    ...(cookiesArgs.length ? [
       { name: 'web_creator+cookies', args: [...baseArgs, '--extractor-args', 'youtube:player_client=web_creator', ...cookiesArgs] },
     ] : []),
-    // Strategy 5: tv (TV client, different auth flow)
-    { name: 'tv', args: [...baseArgs, '--extractor-args', 'youtube:player_client=tv'] },
   ];
 
   console.log(`📋 Strategies: ${strategies.map(s => s.name).join(' → ')}`);
@@ -299,13 +326,14 @@ const downloadViaPiped = async (videoId: string, tmpDir: string, ffmpegLocation:
 
 // Legacy helper for /api/youtube/info (simple, non-critical)
 const getYtBaseArgs = () => {
+  const cookiePath = getCookiePath();
   const args = [
     '--no-check-certificates',
     '--no-warnings',
     '--force-ipv4',
     '--sleep-requests', '0.5',
     '--add-header', 'Accept-Language: en-US,en;q=0.9',
-    ...(persistentCookiePath ? ['--cookies', persistentCookiePath] : []),
+    ...(cookiePath ? ['--cookies', cookiePath] : []),
     ...(process.env.YT_PROXY ? ['--proxy', process.env.YT_PROXY] : [])
   ];
   return { args, tempFile: null };
@@ -443,7 +471,7 @@ app.post('/api/roblox/validate-key', async (req, res) => {
 
 app.post('/api/roblox/upload', upload.single('file'), async (req, res) => {
   const file = req.file;
-  const { apiKey, userId, supabaseUserId, name, description } = req.body;
+  const { apiKey, userId, groupId, uploadTarget, supabaseUserId, name, description } = req.body;
 
   if (!apiKey || !file) {
     console.error('❌ Upload failed: Missing API Key or File');
@@ -484,24 +512,31 @@ app.post('/api/roblox/upload', upload.single('file'), async (req, res) => {
     const outputPath = path.join(tmpDir, 'audio.ogg');
     fs.writeFileSync(inputPath, file.buffer);
 
-    // Convert using ffmpeg to ogg
-    const vorbisArgs = await getVorbisEncoderArgs(ffmpegLocation);
-    await new Promise<void>((resolve, reject) => {
-      execFile(ffmpegLocation, ['-i', inputPath, '-vn', ...vorbisArgs, '-y', outputPath],
-        { timeout: 60000 }, (err) => err ? reject(err) : resolve());
-    });
+    let fileBlob: Blob;
+    try {
+      const vorbisArgs = await getVorbisEncoderArgs(ffmpegLocation);
+      await new Promise<void>((resolve, reject) => {
+        execFile(ffmpegLocation, ['-i', inputPath, '-vn', ...vorbisArgs, '-y', outputPath],
+          { timeout: 60000 }, (err) => err ? reject(err) : resolve());
+      });
+      const oggBuffer = fs.readFileSync(outputPath);
+      fileBlob = new Blob([new Uint8Array(oggBuffer)], { type: 'audio/ogg' });
+    } catch (ffmpegErr: any) {
+      console.warn(`⚠️ FFmpeg not available (${ffmpegErr.message}). Using original file directly.`);
+      fileBlob = new Blob([new Uint8Array(file.buffer)], { type: file.mimetype || 'audio/mpeg' });
+    }
 
-    const oggBuffer = fs.readFileSync(outputPath);
-    const fileBlob = new Blob([new Uint8Array(oggBuffer)], { type: 'audio/ogg' });
+    const isGroupTarget = (uploadTarget === 'group' || (!uploadTarget && groupId)) && groupId;
+    const creator = isGroupTarget
+      ? { groupId: String(groupId) }
+      : { userId: String(userId || "0") };
 
     const metadata = {
       assetType: 'Audio',
       displayName: name || 'Uploaded Audio',
       description: description || 'Uploaded via Disperser Studio',
       creationContext: {
-        creator: {
-          userId: userId || "0"
-        }
+        creator
       }
     };
 
@@ -509,7 +544,7 @@ app.post('/api/roblox/upload', upload.single('file'), async (req, res) => {
     formData.append('request', JSON.stringify(metadata));
     formData.append('fileContent', fileBlob, 'audio.ogg');
 
-    console.log(`🚀 Uploading to Roblox (Transcoded to OGG): ${metadata.displayName} (Creator: ${userId || 'unknown'})`);
+    console.log(`🚀 Uploading to Roblox (Transcoded to OGG): ${metadata.displayName} (Creator Target: ${isGroupTarget ? `Group ${groupId}` : `User ${userId || 'unknown'}`})`);
 
     const response = await fetch('https://apis.roblox.com/assets/v1/assets', {
       method: 'POST',
@@ -517,7 +552,14 @@ app.post('/api/roblox/upload', upload.single('file'), async (req, res) => {
       body: formData
     });
 
-    const data = await response.json();
+    const responseText = await response.text();
+    let data: any;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('❌ Roblox API non-JSON response:', responseText.substring(0, 300));
+      throw new Error(`Roblox API Error (${response.status}): ${responseText.substring(0, 150) || response.statusText}`);
+    }
 
     if (!response.ok) {
       // DECREMENT ON FAILURE
@@ -553,7 +595,7 @@ app.post('/api/roblox/upload', upload.single('file'), async (req, res) => {
 });
 
 app.post('/api/roblox/upload-from-url', async (req, res) => {
-  const { apiKey, userId, supabaseUserId, name, description, fileUrl } = req.body;
+  const { apiKey, userId, groupId, uploadTarget, supabaseUserId, name, description, fileUrl } = req.body;
 
   if (!apiKey || !fileUrl) {
     return res.status(400).json({ success: false, error: 'Missing API Key or File URL' });
@@ -600,24 +642,32 @@ app.post('/api/roblox/upload-from-url', async (req, res) => {
     const outputPath = path.join(tmpDir, 'audio.ogg');
     fs.writeFileSync(inputPath, buffer);
 
-    // Convert using ffmpeg to ogg
-    const vorbisArgs = await getVorbisEncoderArgs(ffmpegLocation);
-    await new Promise<void>((resolve, reject) => {
-      execFile(ffmpegLocation, ['-i', inputPath, '-vn', ...vorbisArgs, '-y', outputPath],
-        { timeout: 60000 }, (err) => err ? reject(err) : resolve());
-    });
+    let fileBlob: Blob;
+    try {
+      const vorbisArgs = await getVorbisEncoderArgs(ffmpegLocation);
+      await new Promise<void>((resolve, reject) => {
+        execFile(ffmpegLocation, ['-i', inputPath, '-vn', ...vorbisArgs, '-y', outputPath],
+          { timeout: 60000 }, (err) => err ? reject(err) : resolve());
+      });
+      const oggBuffer = fs.readFileSync(outputPath);
+      fileBlob = new Blob([new Uint8Array(oggBuffer)], { type: 'audio/ogg' });
+    } catch (ffmpegErr: any) {
+      console.warn(`⚠️ FFmpeg not available (${ffmpegErr.message}). Using downloaded audio file directly.`);
+      const contentType = downloadRes.headers.get('content-type') || 'audio/mpeg';
+      fileBlob = new Blob([new Uint8Array(buffer)], { type: contentType });
+    }
 
-    const oggBuffer = fs.readFileSync(outputPath);
-    const fileBlob = new Blob([new Uint8Array(oggBuffer)], { type: 'audio/ogg' });
+    const isGroupTarget = (uploadTarget === 'group' || (!uploadTarget && groupId)) && groupId;
+    const creator = isGroupTarget
+      ? { groupId: String(groupId) }
+      : { userId: String(userId || "0") };
 
     const metadata = {
       assetType: 'Audio',
       displayName: name || 'Uploaded Audio',
       description: description || 'Uploaded via Disperser Studio',
       creationContext: {
-        creator: {
-          userId: userId || "0"
-        }
+        creator
       }
     };
 
@@ -625,7 +675,7 @@ app.post('/api/roblox/upload-from-url', async (req, res) => {
     formData.append('request', JSON.stringify(metadata));
     formData.append('fileContent', fileBlob, 'audio.ogg');
 
-    console.log(`🚀 Streaming to Roblox (Transcoded to OGG): ${metadata.displayName}`);
+    console.log(`🚀 Streaming to Roblox (Transcoded to OGG): ${metadata.displayName} (Creator Target: ${isGroupTarget ? `Group ${groupId}` : `User ${userId || 'unknown'}`})`);
 
     const response = await fetch('https://apis.roblox.com/assets/v1/assets', {
       method: 'POST',
@@ -633,7 +683,15 @@ app.post('/api/roblox/upload-from-url', async (req, res) => {
       body: formData
     });
 
-    const data = await response.json();
+    const responseText = await response.text();
+    let data: any;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('❌ Roblox API non-JSON response:', responseText.substring(0, 300));
+      throw new Error(`Roblox API Error (${response.status}): ${responseText.substring(0, 150) || response.statusText}`);
+    }
+
     if (!response.ok) {
       // DECREMENT ON FAILURE
       if (supabaseUserId) {
@@ -642,7 +700,7 @@ app.post('/api/roblox/upload-from-url', async (req, res) => {
           await supabase.from('users').update({ uploads_today: user.uploads_today - 1 }).eq('id', supabaseUserId);
         }
       }
-      throw new Error(data.message || 'Roblox API Error');
+      throw new Error(data.message || `Roblox API Error (${response.status})`);
     }
 
     console.log('✅ Roblox Stream Successful');
@@ -810,7 +868,7 @@ app.post('/api/youtube/download', async (req, res) => {
         url
       ];
 
-      const result: { success: boolean; error?: string; stdout?: string } = await new Promise((resolve) => {
+      let result: { success: boolean; error?: string; stdout?: string } = await new Promise((resolve) => {
         execFile(ytConfig.executable, downloadArgs, { timeout: 120000 }, (err, stdout, stderr) => {
           if (err) {
             console.error(`❌ Strategy "${strategy.name}" failed:`, (stderr || err.message).substring(0, 300));
@@ -822,18 +880,37 @@ app.post('/api/youtube/download', async (req, res) => {
         });
       });
 
+      // Fallback if ffmpeg is missing locally: download direct audio stream without ffmpeg postprocessing
+      if (!result.success && (result.error?.includes('ffmpeg') || result.error?.includes('FFmpeg') || result.error?.includes('container'))) {
+        console.log(`⚠️ FFmpeg missing, retrying strategy "${strategy.name}" in direct audio mode...`);
+        const directArgs = [
+          ...strategy.args,
+          '--rm-cache-dir',
+          '--format', '140/ba/bestaudio/best',
+          '-o', outputFile,
+          '--no-playlist',
+          url
+        ];
+        result = await new Promise((resolve) => {
+          execFile(ytConfig.executable, directArgs, { timeout: 120000 }, (err, stdout, stderr) => {
+            if (err) resolve({ success: false, error: stderr || err.message });
+            else resolve({ success: true, stdout });
+          });
+        });
+      }
+
       if (result.success) {
         // Download succeeded — find the output file
         let actualFile = outputFile;
         if (!fs.existsSync(actualFile)) {
           const files = fs.readdirSync(tmpDir);
-          const oggFile = files.find(f => f.endsWith('.ogg'));
-          if (oggFile) {
-            actualFile = path.join(tmpDir, oggFile);
+          const audioFile = files.find(f => f.endsWith('.ogg') || f.endsWith('.m4a') || f.endsWith('.mp3') || f.endsWith('.webm'));
+          if (audioFile) {
+            actualFile = path.join(tmpDir, audioFile);
           } else {
             const availableFiles = fs.readdirSync(tmpDir);
-            console.error('❌ OGG file not found. Available files in tmp:', availableFiles);
-            throw new Error(`OGG conversion failed - no output file found. Found: ${availableFiles.join(', ') || 'nothing'}`);
+            console.error('❌ Audio file not found. Available files in tmp:', availableFiles);
+            throw new Error(`Audio conversion failed - no output file found. Found: ${availableFiles.join(', ') || 'nothing'}`);
           }
         }
 
