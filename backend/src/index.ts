@@ -98,7 +98,15 @@ const ytConfig = {
 // --- Dynamic cookie file resolver ---
 const getCookiePath = (): string | null => {
   if (process.env.YT_COOKIES) {
-    const val = process.env.YT_COOKIES;
+    let val = process.env.YT_COOKIES;
+    if (!val.includes('# Netscape') && !val.includes('.youtube.com')) {
+      try {
+        const decoded = Buffer.from(val, 'base64').toString('utf-8');
+        if (decoded.includes('# Netscape') || decoded.includes('.youtube.com')) {
+          val = decoded;
+        }
+      } catch (e) { }
+    }
     if (val.includes('# Netscape HTTP Cookie File') || val.includes('curl.haxx.se') || val.includes('\tTRUE\t') || val.includes('.youtube.com')) {
       try {
         const tempPath = path.join(os.tmpdir(), `cookies-persistent.txt`);
@@ -149,38 +157,53 @@ const releaseDownloadSlot = (): void => {
   }
 };
 
+interface DownloadStrategy {
+  name: string;
+  args: string[];
+  usesCookies: boolean;
+}
+
 // Build yt-dlp download strategies — tried in order until one succeeds
-const getDownloadStrategies = () => {
+const getDownloadStrategies = (): DownloadStrategy[] => {
   const cookiePath = getCookiePath();
   const cookiesArgs = cookiePath ? ['--cookies', cookiePath] : [];
   const proxyArgs = process.env.YT_PROXY ? ['--proxy', process.env.YT_PROXY] : [];
 
   console.log(`🍪 Cookies detected: ${cookiePath ? `YES (${cookiePath})` : 'NO'}`);
 
+  const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
+
   const baseArgs = [
     '--no-check-certificates',
     '--force-ipv4',
     '--sleep-requests', '0.5',
+    '--user-agent', userAgent,
     '--add-header', 'Accept-Language: en-US,en;q=0.9',
     ...proxyArgs,
   ];
 
-  const strategies = [
-    // Strategy 1: android_vr (FAST & works without cookies for most public videos)
-    { name: 'android_vr', args: [...baseArgs, '--extractor-args', 'youtube:player_client=android_vr'] },
+  const strategies: DownloadStrategy[] = [];
 
-    // Strategy 2: ios (WITHOUT cookies)
-    { name: 'ios', args: [...baseArgs, '--extractor-args', 'youtube:player_client=ios'] },
+  // PRIORITIZE COOKIES IF AVAILABLE (Bypasses 429 & Datacenter IP Rate Limits)
+  if (cookiesArgs.length) {
+    strategies.push(
+      { name: 'android+cookies', args: [...baseArgs, '--extractor-args', 'youtube:player_client=android', ...cookiesArgs], usesCookies: true },
+      { name: 'tv_embedded+cookies', args: [...baseArgs, '--extractor-args', 'youtube:player_client=tv_embedded', ...cookiesArgs], usesCookies: true },
+      { name: 'mweb+cookies', args: [...baseArgs, '--extractor-args', 'youtube:player_client=mweb', ...cookiesArgs], usesCookies: true },
+      { name: 'android_vr+cookies', args: [...baseArgs, '--extractor-args', 'youtube:player_client=android_vr', ...cookiesArgs], usesCookies: true },
+      { name: 'default+cookies', args: [...baseArgs, ...cookiesArgs], usesCookies: true },
+    );
+  }
 
-    // Strategy 3: tv (WITHOUT cookies)
-    { name: 'tv', args: [...baseArgs, '--extractor-args', 'youtube:player_client=tv'] },
-
-    // Strategy 4: default + cookies (for age-restricted or member-only videos requiring cookies)
-    ...(cookiesArgs.length ? [
-      { name: 'default+cookies', args: [...baseArgs, ...cookiesArgs] },
-      { name: 'web_creator+cookies', args: [...baseArgs, '--extractor-args', 'youtube:player_client=web_creator', ...cookiesArgs] },
-    ] : []),
-  ];
+  // NO-COOKIE STRATEGIES (FOR PUBLIC VIDEOS IF COOKIES ARE NOT PROVIDED OR EXPIRED)
+  strategies.push(
+    { name: 'android_vr', args: [...baseArgs, '--extractor-args', 'youtube:player_client=android_vr'], usesCookies: false },
+    { name: 'android', args: [...baseArgs, '--extractor-args', 'youtube:player_client=android'], usesCookies: false },
+    { name: 'tv_embedded', args: [...baseArgs, '--extractor-args', 'youtube:player_client=tv_embedded'], usesCookies: false },
+    { name: 'mweb', args: [...baseArgs, '--extractor-args', 'youtube:player_client=mweb'], usesCookies: false },
+    { name: 'ios', args: [...baseArgs, '--extractor-args', 'youtube:player_client=ios'], usesCookies: false },
+    { name: 'tv', args: [...baseArgs, '--extractor-args', 'youtube:player_client=tv'], usesCookies: false },
+  );
 
   console.log(`📋 Strategies: ${strategies.map(s => s.name).join(' → ')}`);
   return strategies;
@@ -188,6 +211,11 @@ const getDownloadStrategies = () => {
 
 // --- Invidious/Piped API Fallback ---
 const INVIDIOUS_INSTANCES = [
+  'https://invidious.privacydev.net',
+  'https://invidious.drgns.space',
+  'https://inv.tux.im',
+  'https://inv.us.projectsegfau.lt',
+  'https://invidious.fdn.fr',
   'https://inv.nadeko.net',
   'https://invidious.nerdvpn.de',
   'https://invidious.jing.rocks',
@@ -196,6 +224,10 @@ const INVIDIOUS_INSTANCES = [
 
 const PIPED_INSTANCES = [
   'https://pipedapi.kavin.rocks',
+  'https://pipedapi.tokhmi.xyz',
+  'https://pipedapi.mha.fi',
+  'https://api.piped.privacydev.net',
+  'https://pipedapi.palvelu.org',
   'https://api.piped.yt',
 ];
 
@@ -958,9 +990,15 @@ app.post('/api/youtube/download', async (req, res) => {
 
       lastError = result.error || 'Unknown error';
 
-      // If rate-limited (429), skip all remaining yt-dlp strategies immediately
+      // If rate-limited (429), check if there are untried cookie strategies remaining before skipping yt-dlp
       if (lastError.includes('429') || lastError.includes('Too Many Requests')) {
-        console.warn('⚠️ Rate-limited (429). Skipping to API fallbacks.');
+        const remainingStrategies = strategies.slice(strategies.indexOf(strategy) + 1);
+        const hasUntriedCookieStrategies = remainingStrategies.some(s => s.usesCookies);
+        if (hasUntriedCookieStrategies) {
+          console.warn(`⚠️ Strategy "${strategy.name}" hit 429 rate limit without cookies. Switching to cookie-enabled strategy...`);
+          continue;
+        }
+        console.warn('⚠️ Rate-limited (429) across yt-dlp strategies. Skipping to API fallbacks.');
         break;
       }
 
