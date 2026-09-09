@@ -29,7 +29,9 @@ import {
   CheckSquare,
   X,
   User,
-  Users
+  Users,
+  Sparkles,
+  FileCode
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
@@ -46,6 +48,7 @@ import {
 
 import { useAppStore } from '../store/useAppStore';
 import { useConfigStore } from '../store/useConfigStore';
+import { AutoFormatModal } from '@/components/AutoFormatModal';
 
 export default function AudioLibrary() {
   const userStr = localStorage.getItem('disperser_user');
@@ -60,6 +63,15 @@ export default function AudioLibrary() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkUploading, setIsBulkUploading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
+
+  // Auto Format Modal state
+  const [isFormatModalOpen, setIsFormatModalOpen] = useState(false);
+  const [formatModalItems, setFormatModalItems] = useState<any[]>([]);
+
+  const handleOpenFormatModal = (itemsToFormat: any[]) => {
+    setFormatModalItems(itemsToFormat);
+    setIsFormatModalOpen(true);
+  };
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -172,17 +184,15 @@ export default function AudioLibrary() {
   };
 
   const toggleSelectAll = () => {
-    const selectableOnPage = paginatedItems.filter(i => i.status === 'pending' || i.status === 'error');
-    if (selectableOnPage.length === 0) return;
-
-    const allSelectableSelected = selectableOnPage.every(i => selectedIds.has(i.id));
+    if (paginatedItems.length === 0) return;
+    const allPageSelected = paginatedItems.every(i => selectedIds.has(i.id));
 
     setSelectedIds(prev => {
       const next = new Set(prev);
-      if (allSelectableSelected) {
-        selectableOnPage.forEach(i => next.delete(i.id));
+      if (allPageSelected) {
+        paginatedItems.forEach(i => next.delete(i.id));
       } else {
-        selectableOnPage.forEach(i => next.add(i.id));
+        paginatedItems.forEach(i => next.add(i.id));
       }
       return next;
     });
@@ -314,11 +324,9 @@ export default function AudioLibrary() {
                   <Checkbox
                     checked={
                       paginatedItems.length > 0 &&
-                      paginatedItems.filter(i => i.status === 'pending' || i.status === 'error').length > 0 &&
-                      paginatedItems.filter(i => i.status === 'pending' || i.status === 'error').every(i => selectedIds.has(i.id))
+                      paginatedItems.every(i => selectedIds.has(i.id))
                     }
                     onCheckedChange={toggleSelectAll}
-                    disabled={currentRole === 'Free' || paginatedItems.filter(i => i.status === 'pending' || i.status === 'error').length === 0}
                   />
                 </TableHead>
                 <TableHead className="text-slate-300">Asset Details</TableHead>
@@ -349,7 +357,6 @@ export default function AudioLibrary() {
                         <Checkbox
                           checked={isSelected}
                           onCheckedChange={() => toggleSelect(item.id)}
-                          disabled={item.status !== 'pending' && item.status !== 'error'}
                         />
                       </TableCell>
                       <TableCell className="py-4">
@@ -382,6 +389,17 @@ export default function AudioLibrary() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenFormatModal([item])}
+                            className="h-7 px-2.5 bg-slate-900 border-slate-800 hover:border-cyan-500/50 hover:bg-cyan-500/10 text-cyan-400 text-[10px] gap-1.5"
+                            title="Format Lua Code"
+                          >
+                            <Sparkles size={12} />
+                            Format
+                          </Button>
+
                           {(item.status === 'pending' || (item.status === 'error' && !item.errorMessage?.includes('Rejected'))) && (
                             <Button
                               size="sm"
@@ -482,6 +500,14 @@ export default function AudioLibrary() {
             </div>
 
             <div className="flex items-center gap-2">
+              <Button
+                onClick={() => handleOpenFormatModal(items.filter(i => selectedIds.has(i.id)))}
+                className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs px-4 h-10 gap-2 shadow-lg shadow-cyan-500/20 font-bold shrink-0"
+              >
+                <Sparkles size={16} />
+                <span>Format Lua</span>
+              </Button>
+
               {currentRole === 'Free' ? (
                 <Button
                   disabled
@@ -495,7 +521,7 @@ export default function AudioLibrary() {
                 <Button
                   onClick={handleBulkUpload}
                   disabled={isBulkUploading}
-                  className="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-4 h-10 gap-2"
+                  className="bg-slate-800 hover:bg-slate-700 text-white text-xs px-4 h-10 gap-2"
                 >
                   {isBulkUploading ? (
                     <>
@@ -541,6 +567,13 @@ export default function AudioLibrary() {
           </div>
         </div>
       )}
+
+      {/* Auto Format Lua Modal */}
+      <AutoFormatModal
+        isOpen={isFormatModalOpen}
+        onClose={() => setIsFormatModalOpen(false)}
+        selectedItems={formatModalItems}
+      />
 
       {/* Activity Logs Section */}
       <ActivityLogs logs={logs} onClear={clearLogs} />
