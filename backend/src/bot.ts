@@ -23,7 +23,7 @@ export function initBot(supabase: any) {
           // Check if panel already exists
           const messages = await channel.messages.fetch({ limit: 10 });
           const hasPanel = messages.some(m => m.author.id === botClient.user?.id && m.embeds.length > 0 && m.embeds[0].title === '💎 Disperser Studio Subscriptions');
-          
+
           if (!hasPanel) {
             const embed = new EmbedBuilder()
               .setTitle('💎 Disperser Studio Pro')
@@ -50,13 +50,13 @@ export function initBot(supabase: any) {
 
   botClient.on('interactionCreate', async (interaction) => {
     if (interaction.isButton() && interaction.customId === 'buy_pro') {
-      
+
       let currentInfo = '';
       try {
         const { data: user } = await supabase.from('users').select('current_role, subscription_expires_at').eq('id', interaction.user.id).single();
         if (user && user.current_role && user.current_role !== 'Free') {
-           const expireStr = user.subscription_expires_at ? new Date(user.subscription_expires_at).toLocaleDateString('id-ID') : '-';
-           currentInfo = `\n\n📌 **Status Anda Saat Ini:**\nTier: **${user.current_role}**\nBerakhir Pada: **${expireStr}**\n*(Membeli lagi akan memperpanjang masa aktif 30 hari)*`;
+          const expireStr = user.subscription_expires_at ? new Date(user.subscription_expires_at).toLocaleDateString('id-ID') : '-';
+          currentInfo = `\n\n📌 **Status Anda Saat Ini:**\nTier: **${user.current_role}**\nBerakhir Pada: **${expireStr}**\n*(Membeli lagi akan memperpanjang masa aktif 30 hari)*`;
         }
       } catch (err) {
         console.error('Failed to fetch user role:', err);
@@ -71,7 +71,7 @@ export function initBot(supabase: any) {
       const merchantCode = process.env.DUITKU_MERCHANT_CODE || '';
       const apiKey = process.env.DUITKU_API_KEY || '';
       const merchantOrderId = `ORDER-${Date.now()}`;
-      
+
       const signatureString = merchantCode + merchantOrderId + price + apiKey;
       const signature = crypto.createHash('md5').update(signatureString).digest('hex');
 
@@ -91,8 +91,8 @@ export function initBot(supabase: any) {
       // 2. Request API Duitku
       try {
         const isSandbox = process.env.DUITKU_ENV === 'sandbox';
-        const apiUrl = isSandbox 
-          ? 'https://sandbox.duitku.com/webapi/api/merchant/v2/inquiry' 
+        const apiUrl = isSandbox
+          ? 'https://sandbox.duitku.com/webapi/api/merchant/v2/inquiry'
           : 'https://passport.duitku.com/webapi/api/merchant/v2/inquiry';
 
         const response = await fetch(apiUrl, {
@@ -101,7 +101,7 @@ export function initBot(supabase: any) {
           body: JSON.stringify({
             merchantCode,
             paymentAmount: price,
-            paymentMethod: "VC", 
+            paymentMethod: "VC",
             merchantOrderId,
             productDetails: `Langganan ${roleName}`,
             email: "customer@disperser.com",

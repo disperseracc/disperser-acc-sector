@@ -53,7 +53,7 @@ import { AutoFormatModal } from '@/components/AutoFormatModal';
 export default function AudioLibrary() {
   const userStr = localStorage.getItem('disperser_user');
   const user = userStr ? JSON.parse(userStr) : {};
-  const currentRole = user.current_role || 'Free';
+  const currentRole = user.current_role || 'Pro Plan';
 
   const { items, loading, updateItemLocal, logs, addLog, clearLogs } = useAppStore();
   const { hasConfig, loadingConfig, userId, groupId, uploadTarget, setUploadTarget } = useConfigStore();

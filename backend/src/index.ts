@@ -1140,7 +1140,7 @@ app.post('/api/discord/callback', async (req, res) => {
         },
         body: JSON.stringify({
           access_token: accessToken,
-          roles: ROLE_FREE_ID ? [ROLE_FREE_ID] : []
+          roles: process.env.ROLE_PRO_ID ? [process.env.ROLE_PRO_ID] : (ROLE_FREE_ID ? [ROLE_FREE_ID] : [])
         })
       });
       if (addRes.ok) {
@@ -1150,26 +1150,26 @@ app.post('/api/discord/callback', async (req, res) => {
       }
     }
 
-    // Determine Role
-    let currentRole = 'Free';
+    // Determine Role (Default to Pro Plan for all logged in users)
+    let currentRole = 'Pro Plan';
     if (memberData && memberData.roles) {
-      if (ROLE_ENTERPRISE_ID && memberData.roles.includes(ROLE_ENTERPRISE_ID)) currentRole = 'Enterprise';
+      const ROLE_PRO_ID = process.env.ROLE_PRO_ID;
+      if (ROLE_PRO_ID && memberData.roles.includes(ROLE_PRO_ID)) currentRole = 'Pro Plan';
+      else if (ROLE_ENTERPRISE_ID && memberData.roles.includes(ROLE_ENTERPRISE_ID)) currentRole = 'Enterprise';
       else if (ROLE_STUDIO_ID && memberData.roles.includes(ROLE_STUDIO_ID)) currentRole = 'Studio';
       else if (ROLE_SOLODEV_ID && memberData.roles.includes(ROLE_SOLODEV_ID)) currentRole = 'Solo Dev';
-      else if (ROLE_FREE_ID && memberData.roles.includes(ROLE_FREE_ID)) currentRole = 'Free';
+      else if (ROLE_FREE_ID && memberData.roles.includes(ROLE_FREE_ID)) currentRole = 'Pro Plan';
     }
 
     // Fetch existing user to check expiration
-    const { data: existingUser } = await supabase.from('users').select('subscription_expires_at').eq('id', userId).single();
+    const { data: existingUser } = await supabase.from('users').select('subscription_expires_at').eq('id', userId).maybeSingle();
 
     let isExpired = false;
     if (existingUser && existingUser.subscription_expires_at) {
       const expiresAt = new Date(existingUser.subscription_expires_at).getTime();
-      if (expiresAt < Date.now() && currentRole !== 'Free') {
-        currentRole = 'Free';
+      if (expiresAt < Date.now() && currentRole !== 'Pro Plan' && currentRole !== 'Free') {
+        currentRole = 'Pro Plan';
         isExpired = true;
-        // Optionally remove Discord role here, for now we just downgrade in DB
-        console.log(`⚠️ Subscription expired for ${userId}. Downgrading to Free.`);
       }
     }
 
@@ -1184,7 +1184,7 @@ app.post('/api/discord/callback', async (req, res) => {
         last_login: new Date().toISOString()
       }, { onConflict: 'id' })
       .select('current_role, subscription_expires_at')
-      .single();
+      .maybeSingle();
 
     if (dbError) {
       console.error('❌ Supabase User Sync Error:', dbError);
@@ -1245,7 +1245,7 @@ app.post('/api/subscription/extend', async (req, res) => {
   }
 
   try {
-    const { data: existingUser } = await supabase.from('users').select('subscription_expires_at').eq('id', userId).single();
+    const { data: existingUser } = await supabase.from('users').select('subscription_expires_at').eq('id', userId).maybeSingle();
 
     let baseDate = new Date();
     if (existingUser && existingUser.subscription_expires_at) {

@@ -14,7 +14,7 @@ export default function Overview() {
   const userStr = localStorage.getItem('disperser_user');
   const user = userStr ? JSON.parse(userStr) : {};
   const username = user.username || 'Creator';
-  const [currentRole, setCurrentRole] = useState(user.current_role || 'Free');
+  const [currentRole, setCurrentRole] = useState(user.current_role || 'Pro Plan');
   const [expireDate, setExpireDate] = useState(user.subscription_expires_at
     ? new Date(user.subscription_expires_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
     : '-');
@@ -42,16 +42,17 @@ export default function Overview() {
           .single();
 
         if (dbUser) {
-          setCurrentRole(dbUser.current_role);
+          const activeRole = dbUser.current_role || 'Pro Plan';
+          setCurrentRole(activeRole);
           const newExpireDate = dbUser.subscription_expires_at
             ? new Date(dbUser.subscription_expires_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
             : '-';
           setExpireDate(newExpireDate);
-          
+
           // Daily Reset Logic for Display
           const today = new Date().toISOString().split('T')[0];
           const lastUpload = dbUser.last_upload_date ? new Date(dbUser.last_upload_date).toISOString().split('T')[0] : '';
-          
+
           if (lastUpload !== today) {
             setDailyUploads(0);
           } else {
@@ -59,7 +60,7 @@ export default function Overview() {
           }
 
           // Update localStorage
-          const updatedUser = { ...user, current_role: dbUser.current_role, subscription_expires_at: dbUser.subscription_expires_at, uploads_today: dbUser.uploads_today };
+          const updatedUser = { ...user, current_role: activeRole, subscription_expires_at: dbUser.subscription_expires_at, uploads_today: dbUser.uploads_today };
           localStorage.setItem('disperser_user', JSON.stringify(updatedUser));
         }
       }
@@ -104,12 +105,12 @@ export default function Overview() {
             <div>
               <h3 className="text-lg font-bold text-white mb-1">Configuration Required!</h3>
               <p className="text-sm text-slate-400 leading-relaxed max-w-xl">
-                You haven't set up your <span className="text-white font-semibold">Roblox API Key</span> or <span className="text-white font-semibold">User ID</span> yet. 
+                You haven't set up your <span className="text-white font-semibold">Roblox API Key</span> or <span className="text-white font-semibold">User ID</span> yet.
                 Without these, you won't be able to upload assets to Roblox. Please complete your profile in Settings.
               </p>
             </div>
           </div>
-          <Button 
+          <Button
             variant="destructive"
             className="bg-red-600 hover:bg-red-500 text-white font-bold px-8 shrink-0"
             onClick={() => window.location.href = '/dashboard/settings'}

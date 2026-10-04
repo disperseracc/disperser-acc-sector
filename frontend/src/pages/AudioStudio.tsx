@@ -53,7 +53,7 @@ const assetSchema = z.object({
 export default function AudioStudio() {
   const userStr = localStorage.getItem('disperser_user');
   const user = userStr ? JSON.parse(userStr) : {};
-  const currentRole = user.current_role || 'Free';
+  const currentRole = user.current_role || 'Pro Plan';
 
   const [file, setFile] = useState<File | null>(null);
   const [ytUrl, setYtUrl] = useState('');

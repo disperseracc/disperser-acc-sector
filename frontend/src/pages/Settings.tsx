@@ -185,8 +185,8 @@ export default function Settings() {
                     type="button"
                     onClick={() => setUploadTarget('user')}
                     className={`p-3 rounded-xl border text-left transition-all flex items-start gap-3 ${uploadTarget === 'user'
-                        ? 'bg-cyan-500/10 border-cyan-500/50 text-white ring-1 ring-cyan-500/30'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                      ? 'bg-cyan-500/10 border-cyan-500/50 text-white ring-1 ring-cyan-500/30'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
                       }`}
                   >
                     <User size={18} className={uploadTarget === 'user' ? 'text-cyan-400 mt-0.5' : 'text-slate-500 mt-0.5'} />
@@ -200,8 +200,8 @@ export default function Settings() {
                     type="button"
                     onClick={() => setUploadTarget('group')}
                     className={`p-3 rounded-xl border text-left transition-all flex items-start gap-3 ${uploadTarget === 'group'
-                        ? 'bg-cyan-500/10 border-cyan-500/50 text-white ring-1 ring-cyan-500/30'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                      ? 'bg-cyan-500/10 border-cyan-500/50 text-white ring-1 ring-cyan-500/30'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
                       }`}
                   >
                     <Users size={18} className={uploadTarget === 'group' ? 'text-cyan-400 mt-0.5' : 'text-slate-500 mt-0.5'} />
