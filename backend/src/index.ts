@@ -385,8 +385,13 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 initBot(supabase);
 
 app.use(cors({
-  exposedHeaders: ['X-Audio-Title']
+  origin: true,
+  credentials: true,
+  exposedHeaders: ['X-Audio-Title', 'Content-Disposition'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-api-key']
 }));
+app.options('*', cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -1174,12 +1179,12 @@ app.post('/api/discord/callback', async (req, res) => {
     }
 
     // 3. Save/Update User in Supabase
-    const { data: dbUser, error: dbError } = await supabase
+    let { data: dbUser, error: dbError } = await supabase
       .from('users')
       .upsert({
-        id: userId,
-        username: userData.username,
-        avatar: userData.avatar,
+        id: String(userId),
+        username: userData.username || '',
+        avatar: userData.avatar || '',
         current_role: currentRole,
         last_login: new Date().toISOString()
       }, { onConflict: 'id' })
@@ -1188,6 +1193,23 @@ app.post('/api/discord/callback', async (req, res) => {
 
     if (dbError) {
       console.error('❌ Supabase User Sync Error:', dbError);
+      // Fallback: try upsert without optional columns (avatar/last_login) if schema cache returns error 406 / missing column
+      const fallback = await supabase
+        .from('users')
+        .upsert({
+          id: String(userId),
+          username: userData.username || '',
+          current_role: currentRole
+        }, { onConflict: 'id' })
+        .select('current_role, subscription_expires_at')
+        .maybeSingle();
+
+      if (!fallback.error) {
+        dbUser = fallback.data;
+        console.log('✅ Basic User Sync Succeeded via Fallback');
+      } else {
+        console.error('❌ Fallback User Sync Error:', fallback.error);
+      }
     }
 
     console.log(`✅ Login successful for ${userData.username} (Role: ${currentRole})`);
