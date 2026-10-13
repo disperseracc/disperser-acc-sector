@@ -394,7 +394,10 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB max per audio file
+});
 
 // --- Duitku Callback Endpoint ---
 app.post('/api/payment/duitku-callback', async (req, res) => {

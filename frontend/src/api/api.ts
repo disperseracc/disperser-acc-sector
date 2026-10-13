@@ -11,10 +11,15 @@ const getCurrentUserId = () => {
   return null;
 };
 
-// Using Supabase for audioQueue now.
+// Using LocalForage (IndexedDB) for audio blobs and youtubeHistory
 const historyDb = localforage.createInstance({
   name: 'DisperserDB',
   storeName: 'youtubeHistory'
+});
+
+export const audioBlobsDb = localforage.createInstance({
+  name: 'DisperserDB',
+  storeName: 'audioBlobs'
 });
 
 export const api = {
@@ -80,30 +85,19 @@ export const api = {
     const isMp3 = name.toLowerCase().endsWith('.mp3');
     const isOgg = name.toLowerCase().endsWith('.ogg');
     const isWavBlob = buffer instanceof Blob ? buffer.type === 'audio/wav' : true;
-    const ext = isMp3 ? '.mp3' : (isOgg && !isWavBlob ? '.ogg' : '.wav');
     const contentType = isMp3 ? 'audio/mpeg' : (isOgg && !isWavBlob ? 'audio/ogg' : 'audio/wav');
-    const filePath = `audio_${id}${ext}`;
+    const blob = buffer instanceof Blob ? buffer : new Blob([buffer as any], { type: contentType });
 
-    // Upload file to Supabase Storage
-    const { error: uploadError } = await supabase.storage
-      .from('audios')
-      .upload(filePath, buffer, {
-        contentType,
-        upsert: true
-      });
+    // Store binary file in local IndexedDB (Zero Supabase Storage quota & egress used!)
+    await audioBlobsDb.setItem(id, blob);
 
-    if (uploadError) {
-      console.error('Supabase storage upload error:', uploadError);
-      throw uploadError;
-    }
-
-    // Insert metadata to Supabase DB
+    // Insert ONLY metadata to Supabase DB
     const item = {
       id,
       name,
       description,
       status: 'pending',
-      file_path: filePath,
+      file_path: 'local',
       user_id: getCurrentUserId()
     };
 
@@ -113,6 +107,8 @@ export const api = {
 
     if (dbError) {
       console.error('Supabase DB insert error:', dbError);
+      // Clean up local blob if DB metadata insert fails
+      await audioBlobsDb.removeItem(id);
       throw dbError;
     }
 
@@ -140,7 +136,12 @@ export const api = {
   },
 
   async deleteItem(id: string) {
-    // 1. Get file_path
+    // 1. Delete from local IndexedDB
+    try {
+      await audioBlobsDb.removeItem(id);
+    } catch (e) { }
+
+    // 2. Check if legacy file exists on Supabase Storage
     const { data: item } = await supabase
       .from('audio_library')
       .select('file_path')
@@ -148,16 +149,20 @@ export const api = {
       .eq('user_id', getCurrentUserId())
       .single();
 
-    // 2. Delete from storage if exists
-    if (item?.file_path) {
+    // 3. Delete from storage if legacy cloud file
+    if (item?.file_path && item.file_path !== 'local') {
       await supabase.storage.from('audios').remove([item.file_path]);
     }
 
-    // 3. Delete from DB
+    // 4. Delete from DB
     await supabase.from('audio_library').delete().eq('id', id).eq('user_id', getCurrentUserId());
   },
 
   async deleteFileOnly(id: string) {
+    try {
+      await audioBlobsDb.removeItem(id);
+    } catch (e) { }
+
     const { data: item } = await supabase
       .from('audio_library')
       .select('file_path')
@@ -165,13 +170,28 @@ export const api = {
       .eq('user_id', getCurrentUserId())
       .single();
 
-    if (item?.file_path) {
+    if (item?.file_path && item.file_path !== 'local') {
       await supabase.storage.from('audios').remove([item.file_path]);
       await supabase.from('audio_library').update({ file_path: null }).eq('id', id).eq('user_id', getCurrentUserId());
     }
   },
 
+  async removeLocalBlob(id: string) {
+    try {
+      await audioBlobsDb.removeItem(id);
+    } catch (e) { }
+  },
+
   async getItemBuffer(id: string): Promise<Blob | null> {
+    // 1. First check IndexedDB (Fast & 0 Supabase bandwidth)
+    try {
+      const localBlob = await audioBlobsDb.getItem<Blob>(id);
+      if (localBlob) return localBlob;
+    } catch (e) {
+      console.warn('Error reading from IndexedDB:', e);
+    }
+
+    // 2. Fallback to Supabase Storage for legacy uploaded items
     const { data: item } = await supabase
       .from('audio_library')
       .select('file_path')
@@ -179,7 +199,8 @@ export const api = {
       .eq('user_id', getCurrentUserId())
       .single();
 
-    if (!item?.file_path) return null;
+    if (!item?.file_path || item.file_path === 'local') return null;
+
     const { data: urlData, error: urlError } = await supabase.storage
       .from('audios')
       .createSignedUrl(item.file_path, 60);
@@ -207,7 +228,7 @@ export const api = {
       .eq('user_id', getCurrentUserId())
       .single();
 
-    if (!item?.file_path) return null;
+    if (!item?.file_path || item.file_path === 'local') return null;
 
     const { data, error } = await supabase.storage
       .from('audios')

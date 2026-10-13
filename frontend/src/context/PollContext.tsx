@@ -107,12 +107,16 @@ export const PollProvider = ({ children }: { children: React.ReactNode }) => {
           addLog(`[Item:${id}] Moderation PASSED! Asset is live.`, 'success');
           await api.updateItem(id, { status: 'success' });
           updateItemLocal(id, { status: 'success' });
+          api.removeLocalBlob(id);
+          api.deleteFileOnly(id).catch(() => {});
         } else if (moderationState === 'rejected' || moderationState === 'moderation_state_rejected') {
           clearInterval(polls.current[id]);
           delete polls.current[id];
           addLog(`[Item:${id}] Moderation REJECTED by Roblox.`, 'error');
           await api.updateItem(id, { status: 'rejected' });
           updateItemLocal(id, { status: 'rejected' });
+          api.removeLocalBlob(id);
+          api.deleteFileOnly(id).catch(() => {});
         }
       } catch (err) {
         // Silent retry for meta

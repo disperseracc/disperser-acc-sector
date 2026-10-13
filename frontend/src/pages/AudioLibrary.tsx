@@ -113,12 +113,22 @@ export default function AudioLibrary() {
     addLog(`[Item:${id}] Starting upload process for "${item.name}"... (Target: ${uploadTarget.toUpperCase()})`, 'info');
 
     try {
-      addLog(`[Item:${id}] Preparing secure transfer...`, 'info');
-      const signedUrl = await api.getSignedUrl(id);
-      if (!signedUrl) throw new Error('Failed to generate source link');
+      addLog(`[Item:${id}] Preparing file transfer...`, 'info');
+      const localBlob = await api.getItemBuffer(id);
+      let res: any;
 
-      addLog(`[Item:${id}] Uploading to Roblox as ${uploadTarget === 'group' ? 'Group' : 'User'} asset...`, 'info');
-      const res = await api.robloxUploadFromUrl(item.name, item.description || 'Uploaded via Disperser Studio', signedUrl, uploadTarget);
+      if (localBlob) {
+        addLog(`[Item:${id}] Uploading directly from local storage to Roblox (${uploadTarget.toUpperCase()})...`, 'info');
+        res = await api.robloxUpload(item.name, item.description || 'Uploaded via Disperser Studio', localBlob, uploadTarget);
+      } else {
+        const signedUrl = await api.getSignedUrl(id);
+        if (!signedUrl) throw new Error('Audio file not found in local storage or cloud');
+        addLog(`[Item:${id}] Uploading legacy cloud asset to Roblox...`, 'info');
+        res = await api.robloxUploadFromUrl(item.name, item.description || 'Uploaded via Disperser Studio', signedUrl, uploadTarget);
+        if (res.success) {
+          api.deleteFileOnly(id).catch(err => console.warn('Failed to cleanup legacy storage:', err));
+        }
+      }
 
       if (res.success && res.operation?.path) {
         addLog(`[Item:${id}] Upload successful! Operation Path: ${res.operation.path}`, 'success');
