@@ -185,7 +185,7 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
   const chooseExperience = (id: string, target: boolean) => target ? setTargetUniverse(id) : changeSource(id);
 
   return (
-    <section id="backup-workbench" className="scroll-mt-6 space-y-5 rounded-3xl border border-cyan-500/20 bg-slate-950/50 p-5 sm:p-7">
+    <section id="backup-workbench" translate="no" className="notranslate scroll-mt-6 space-y-5 rounded-3xl border border-cyan-500/20 bg-slate-950/50 p-5 sm:p-7">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="flex items-center gap-2 text-xl font-bold text-white"><ShieldCheck size={22} className="text-cyan-400" /> Data backup & recovery</h2>
