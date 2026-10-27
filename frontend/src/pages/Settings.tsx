@@ -127,148 +127,169 @@ export default function Settings() {
       <Helmet>
         <title>Settings | Disperser Studio</title>
       </Helmet>
-      <div className="page-header">
-        <h1 className="page-title">Settings</h1>
-        <p className="page-desc">Manage your Roblox credentials and application preferences.</p>
+      <div className="page-header relative">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-semibold uppercase tracking-wider mb-2">
+          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+          Credentials & Cloud Setup
+        </div>
+        <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight flex items-center gap-3">
+          <Key className="text-cyan-400 drop-shadow-[0_0_15px_rgba(6,182,212,0.4)]" size={36} />
+          Settings
+        </h1>
+        <p className="page-desc mt-1.5 text-slate-400 text-sm max-w-xl">
+          Manage your Roblox credentials, Open Cloud permissions, and upload preferences.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Settings Form */}
         <div className="lg:col-span-2 space-y-6">
-          <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Key className="text-cyan-400" size={20} />
+          <Card className="glass-panel rounded-3xl border border-white/[0.08] backdrop-blur-2xl shadow-2xl">
+            <CardHeader className="p-6 md:p-8 pb-4">
+              <CardTitle className="text-2xl font-black text-white flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                  <Key size={20} />
+                </div>
                 Roblox Authentication
               </CardTitle>
-              <CardDescription className="text-slate-400">
-                These credentials are required to interact with the Roblox Open Cloud API.
+              <CardDescription className="text-slate-400 text-sm mt-1">
+                These credentials are required to interact with the Roblox Open Cloud API for asset uploads & studio synchronization.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
+            <CardContent className="p-6 md:p-8 pt-2 space-y-6">
+              <div className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="userId" className="text-slate-300 flex items-center gap-2">
-                    <User size={14} /> Roblox User ID
+                  <Label htmlFor="userId" className="text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                    <User size={14} className="text-cyan-400" /> Roblox User ID
                   </Label>
                   <Input
                     id="userId"
                     placeholder="e.g. 12345678"
                     value={userId}
                     onChange={(e) => setUserId(e.target.value)}
-                    className="bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus-visible:ring-cyan-500/50"
+                    className="bg-slate-950/60 border-white/[0.08] text-white text-sm rounded-xl placeholder:text-slate-600 focus-visible:ring-cyan-500/40 h-11"
                   />
-                  <p className="text-[11px] text-slate-500">Your unique Roblox numeric ID (can be found in your profile URL).</p>
+                  <p className="text-xs text-slate-400">Your unique Roblox numeric ID (can be found in your Roblox profile URL).</p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="groupId" className="text-slate-300 flex items-center gap-2">
-                    <Users size={14} /> Roblox Group ID <span className="text-xs text-slate-500 font-normal">(Optional)</span>
+                  <Label htmlFor="groupId" className="text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                    <Users size={14} className="text-cyan-400" /> Roblox Group ID <span className="text-[11px] text-slate-500 font-normal lowercase">(optional)</span>
                   </Label>
                   <Input
                     id="groupId"
                     placeholder="e.g. 98765432"
                     value={groupId}
                     onChange={(e) => setGroupId(e.target.value)}
-                    className="bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus-visible:ring-cyan-500/50"
+                    className="bg-slate-950/60 border-white/[0.08] text-white text-sm rounded-xl placeholder:text-slate-600 focus-visible:ring-cyan-500/40 h-11"
                   />
-                  <p className="text-[11px] text-slate-500">Pilih/Isi ini jika API Key kamu dikonfigurasi untuk Group. Audio akan langsung terhubung ke Group ini saat diupload.</p>
+                  <p className="text-xs text-slate-400">Pilih atau isi Group ID ini jika API Key dikonfigurasi untuk komunitas Group Roblox.</p>
                 </div>
               </div>
 
-              <div className="space-y-2 pt-2 border-t border-slate-800">
-                <Label className="text-slate-300 flex items-center gap-2">
-                  <Users size={14} /> Mode Default Target Upload
+              <div className="space-y-3 pt-4 border-t border-white/[0.06]">
+                <Label className="text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                  <Users size={14} className="text-cyan-400" /> Mode Default Target Upload
                 </Label>
-                <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                   <button
                     type="button"
                     onClick={() => setUploadTarget('user')}
-                    className={`p-3 rounded-xl border text-left transition-all flex items-start gap-3 ${uploadTarget === 'user'
-                      ? 'bg-cyan-500/10 border-cyan-500/50 text-white ring-1 ring-cyan-500/30'
-                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                    className={`p-4 rounded-2xl border text-left transition-all flex items-start gap-3.5 cursor-pointer ${uploadTarget === 'user'
+                      ? 'glass-panel bg-cyan-500/10 border-cyan-500/40 text-white ring-1 ring-cyan-500/30 shadow-lg shadow-cyan-950/30'
+                      : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:border-white/20 hover:text-white'
                       }`}
                   >
-                    <User size={18} className={uploadTarget === 'user' ? 'text-cyan-400 mt-0.5' : 'text-slate-500 mt-0.5'} />
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${uploadTarget === 'user' ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-500'}`}>
+                      <User size={18} />
+                    </div>
                     <div>
-                      <div className="text-xs font-bold">Personal Account</div>
-                      <div className="text-[10px] text-slate-500">Upload atas nama User ID</div>
+                      <div className="text-sm font-bold text-white">Personal Account</div>
+                      <div className="text-xs text-slate-400 mt-0.5">Upload atas nama User ID</div>
                     </div>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setUploadTarget('group')}
-                    className={`p-3 rounded-xl border text-left transition-all flex items-start gap-3 ${uploadTarget === 'group'
-                      ? 'bg-cyan-500/10 border-cyan-500/50 text-white ring-1 ring-cyan-500/30'
-                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                    className={`p-4 rounded-2xl border text-left transition-all flex items-start gap-3.5 cursor-pointer ${uploadTarget === 'group'
+                      ? 'glass-panel bg-cyan-500/10 border-cyan-500/40 text-white ring-1 ring-cyan-500/30 shadow-lg shadow-cyan-950/30'
+                      : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:border-white/20 hover:text-white'
                       }`}
                   >
-                    <Users size={18} className={uploadTarget === 'group' ? 'text-cyan-400 mt-0.5' : 'text-slate-500 mt-0.5'} />
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${uploadTarget === 'group' ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-500'}`}>
+                      <Users size={18} />
+                    </div>
                     <div>
-                      <div className="text-xs font-bold">Roblox Group</div>
-                      <div className="text-[10px] text-slate-500">Upload atas nama Group ID</div>
+                      <div className="text-sm font-bold text-white">Roblox Group</div>
+                      <div className="text-xs text-slate-400 mt-0.5">Upload atas nama Group ID</div>
                     </div>
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="apiKey" className="text-slate-300 flex items-center gap-2">
-                  <Key size={14} /> Open Cloud API Key
+              <div className="space-y-2 pt-2">
+                <Label htmlFor="apiKey" className="text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                  <Key size={14} className="text-cyan-400" /> Open Cloud API Key
                 </Label>
                 <Input
                   id="apiKey"
                   type="password"
-                  placeholder="Paste your API key here..."
+                  placeholder="Paste your Roblox Open Cloud API key here..."
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  className="bg-slate-950 border-slate-800 text-white placeholder:text-slate-600 focus-visible:ring-cyan-500/50"
+                  className="bg-slate-950/60 border-white/[0.08] text-white text-sm font-mono rounded-xl placeholder:text-slate-600 focus-visible:ring-cyan-500/40 h-11"
                 />
-                <p className="text-[11px] text-slate-500">Required permissions: Asset Read & Asset Write.</p>
+                <p className="text-xs text-slate-400">Required permissions: Assets API (Read & Write).</p>
               </div>
 
               {status !== 'idle' && (
-                <div className={`p-4 rounded-xl border animate-in fade-in slide-in-from-top-2 duration-300 ${status === 'success'
-                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                  : 'bg-red-500/10 border-red-500/20 text-red-400'
+                <div className={`p-4 rounded-2xl border animate-in fade-in slide-in-from-top-2 duration-300 ${status === 'success'
+                  ? 'glass-panel bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'glass-panel bg-red-500/10 border-red-500/30 text-red-300'
                   }`}>
-                  <div className="flex items-center gap-2 text-xs font-bold">
-                    {status === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
-                    {status === 'success' ? 'SUCCESS' : 'VALIDATION ERROR'}
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+                    {status === 'success' ? <CheckCircle size={16} className="text-emerald-400" /> : <AlertCircle size={16} className="text-red-400" />}
+                    {status === 'success' ? 'Validation Passed' : 'Validation Error'}
                   </div>
-                  <p className="text-[12px] mt-1 opacity-80">{statusMsg}</p>
+                  <p className="text-xs mt-1 leading-relaxed opacity-90">{statusMsg}</p>
                 </div>
               )}
 
               <Button
                 onClick={handleSave}
                 disabled={loading}
-                className="w-full bg-cyan-600 hover:bg-cyan-500 text-white gap-2 transition-all active:scale-[0.98]"
+                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold h-12 rounded-2xl shadow-lg shadow-cyan-500/25 gap-2.5 transition-all cursor-pointer hover:scale-[1.01] active:scale-[0.99] text-sm"
               >
                 {loading ? <Loader2 className="animate-spin" size={18} /> : (saved ? <CheckCircle size={18} /> : <Save size={18} />)}
-                {loading ? 'Saving...' : (saved ? 'Changes Saved' : 'Save Credentials')}
+                {loading ? 'Validating & Saving...' : (saved ? 'Credentials Verified & Saved!' : 'Save Credentials')}
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Shield className="text-cyan-400" size={20} />
+          <Card className="glass-panel rounded-3xl border border-white/[0.08] backdrop-blur-xl shadow-xl">
+            <CardHeader className="p-6 md:p-8 pb-3">
+              <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                  <Shield size={18} />
+                </div>
                 Security Information
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-400 mb-4">
-                Your credentials are stored securely in your browser's local storage and are only sent directly to your local backend server to communicate with Roblox APIs.
+            <CardContent className="p-6 md:p-8 pt-2">
+              <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                Your credentials are encrypted and stored safely in your browser's local storage and only transmitted to your local backend server to communicate securely with official Roblox Open Cloud endpoints.
               </p>
-              <div className="bg-slate-950 p-4 rounded-lg border border-slate-800">
-                <h4 className="text-sm font-medium text-white mb-2">Required API Permissions</h4>
+              <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/[0.06]">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-2">Required API Permissions</h4>
                 <ul className="text-xs text-slate-400 space-y-2">
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 mt-1 shrink-0" />
-                    <strong>Assets API</strong> (Read & Write) - Required for uploading and checking status.
+                  <li className="flex items-start gap-2.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
+                    <span><strong className="text-slate-200">Assets API</strong> (Read & Write) — Required for uploading audio assets and tracking moderation status.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
+                    <span><strong className="text-slate-200">DataStore API</strong> (Read & Write) — Optional, used if accessing DataStore snapshots on Backup Server.</span>
                   </li>
                 </ul>
               </div>
@@ -278,29 +299,32 @@ export default function Settings() {
 
         {/* Instructions Sidebar */}
         <div className="space-y-6">
-          <Card className="bg-slate-900/50 border-slate-800 border-dashed">
-            <CardHeader>
-              <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Info className="text-cyan-400" size={16} />
+          <Card className="glass-panel rounded-3xl border border-white/[0.08] backdrop-blur-xl shadow-xl">
+            <CardHeader className="p-6 pb-3">
+              <CardTitle className="text-base font-bold text-white flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                  <Info size={16} />
+                </div>
                 How to get API Keys?
               </CardTitle>
             </CardHeader>
-            <CardContent className="text-sm text-slate-400 space-y-4 leading-relaxed">
-              <ol className="list-decimal list-inside space-y-3">
+            <CardContent className="p-6 pt-2 text-xs text-slate-400 space-y-4 leading-relaxed">
+              <ol className="list-decimal list-inside space-y-3 font-medium">
                 <li>
-                  Go to the <a href="https://create.roblox.com/dashboard/credentials?activeTab=ApiKeysTab" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline inline-flex items-center gap-1">
+                  Go to the <a href="https://create.roblox.com/dashboard/credentials?activeTab=ApiKeysTab" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 underline font-semibold inline-flex items-center gap-1">
                     Roblox Creator Dashboard <ExternalLink size={12} />
                   </a>
                 </li>
-                <li>Click on <span className="text-white font-medium">"Create API Key"</span>.</li>
-                <li>Add a name (e.g., "Disperser Studio").</li>
+                <li>Click on <span className="text-white font-semibold">"Create API Key"</span>.</li>
+                <li>Add a name (e.g., <span className="text-cyan-300 font-mono">Disperser Studio</span>).</li>
                 <li>
-                  In <span className="text-white font-medium">API Permissions</span>, add:
-                  <ul className="list-disc list-inside ml-4 mt-1 text-xs text-slate-500">
+                  In <span className="text-white font-semibold">API Permissions</span>, add:
+                  <ul className="list-disc list-inside ml-4 mt-1.5 text-xs text-slate-400 space-y-1">
                     <li>Assets API (Read & Write)</li>
+                    <li>Ordered DataStore (Optional)</li>
                   </ul>
                 </li>
-                <li>Copy the generated key and paste it here!</li>
+                <li>Copy the generated key and paste it into the field on the left!</li>
               </ol>
             </CardContent>
           </Card>

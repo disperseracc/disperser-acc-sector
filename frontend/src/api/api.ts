@@ -22,6 +22,55 @@ export const audioBlobsDb = localforage.createInstance({
   storeName: 'audioBlobs'
 });
 
+// Helper for safe JSON fetching and user-friendly error messages
+async function safeJsonFetch(input: string, init?: RequestInit) {
+  let res: Response;
+  try {
+    res = await fetch(input, init);
+  } catch (err: any) {
+    throw new Error(`Tidak dapat menghubungi backend (${err.message || 'Network Error'}). Pastikan backend server aktif di ${BASE_URL}`);
+  }
+
+  const text = await res.text();
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    let msg = `Server mengembalikan respon non-JSON (${res.status})`;
+    if (text.includes('<!DOCTYPE html>') || text.includes('<html')) {
+      if (res.status === 404) {
+        msg = `Endpoint backend tidak ditemukan (404 Not Found). Pastikan backend server Disperser sudah di-restart.`;
+      } else {
+        msg = `Server Error (${res.status}): Server mengembalikan halaman HTML. Pastikan backend server Disperser aktif di port 5001.`;
+      }
+    }
+    throw new Error(msg);
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || `Request gagal (${res.status})`);
+  }
+
+  return data;
+}
+
+const buildApiUrl = (endpoint: string, params?: Record<string, string | undefined>) => {
+  const base = BASE_URL.replace(/\/+$/, '');
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  let url = `${base}${cleanEndpoint}`;
+  if (params) {
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.set(key, value);
+      }
+    }
+    const qs = searchParams.toString();
+    if (qs) url += `?${qs}`;
+  }
+  return url;
+};
+
 export const api = {
   // History Store
   async getHistory() {
@@ -334,51 +383,42 @@ export const api = {
 
   async checkOperation(opId: string) {
     const key = localStorage.getItem('disperser_key');
-    const res = await fetch(`${BASE_URL}/api/roblox/operation/${opId}?apiKey=${encodeURIComponent(key || '')}`);
-    return await res.json();
+    const url = buildApiUrl(`/api/roblox/operation/${encodeURIComponent(opId)}`, {
+      apiKey: key || ''
+    });
+    return await safeJsonFetch(url);
   },
 
   async getAssetMeta(assetId: string) {
     const key = localStorage.getItem('disperser_key');
-    const res = await fetch(`${BASE_URL}/api/roblox/asset/${assetId}?apiKey=${encodeURIComponent(key || '')}`);
-    return await res.json();
+    const url = buildApiUrl(`/api/roblox/asset/${encodeURIComponent(assetId)}`, {
+      apiKey: key || ''
+    });
+    return await safeJsonFetch(url);
   },
 
   // --- Backup Server & Roblox Experiences API ---
   async getCommunityExperiences(groupId: string, cursor?: string) {
-    const url = new URL(`${BASE_URL}/api/roblox/community/${groupId}/experiences`);
-    if (cursor) url.searchParams.set('cursor', cursor);
-    const res = await fetch(url.toString());
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to fetch community experiences');
-    }
-    return data;
+    const url = buildApiUrl(`/api/roblox/community/${encodeURIComponent(groupId)}/experiences`, {
+      cursor
+    });
+    return await safeJsonFetch(url);
   },
 
   async getUserExperiences(userId: string, cursor?: string) {
-    const url = new URL(`${BASE_URL}/api/roblox/user/${userId}/experiences`);
-    if (cursor) url.searchParams.set('cursor', cursor);
-    const res = await fetch(url.toString());
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to fetch creator experiences');
-    }
-    return data;
+    const url = buildApiUrl(`/api/roblox/user/${encodeURIComponent(userId)}/experiences`, {
+      cursor
+    });
+    return await safeJsonFetch(url);
   },
 
   async getExperienceDataStores(universeId: string, apiKey?: string) {
     const key = apiKey || localStorage.getItem('disperser_key') || '';
-    const url = new URL(`${BASE_URL}/api/roblox/experience/${universeId}/datastores`);
-    const res = await fetch(url.toString(), {
+    const url = buildApiUrl(`/api/roblox/experience/${encodeURIComponent(universeId)}/datastores`);
+    return await safeJsonFetch(url, {
       headers: {
         'x-api-key': key
       }
     });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to fetch DataStores list');
-    }
-    return data;
   }
 };

@@ -120,124 +120,144 @@ export default function Overview() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {stats.map((stat, i) => (
-          <Card key={i} className="bg-slate-900/40 border-slate-800 backdrop-blur-sm hover:border-cyan-500/30 transition-all group">
-            <CardHeader className="pb-2">
-              <div className="w-10 h-10 rounded-lg bg-slate-800/50 flex items-center justify-center mb-2 group-hover:bg-cyan-500/10 transition-colors">
+          <div
+            key={i}
+            className="group relative rounded-3xl bg-slate-900/40 hover:bg-slate-900/60 border border-white/[0.08] hover:border-cyan-500/30 backdrop-blur-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-cyan-500/10"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{stat.label}</span>
+              <div className="w-10 h-10 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-hover:scale-110 transition-transform">
                 {stat.icon}
               </div>
-              <CardTitle className="text-sm font-medium text-slate-400">{stat.label}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white mb-1">{stat.value}</div>
-              <div className="text-xs text-slate-500">{stat.trend}</div>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="text-3xl font-black text-white tracking-tight mb-1">{stat.value}</div>
+            <div className="text-xs text-slate-400 flex items-center gap-1.5 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400/60" />
+              {stat.trend}
+            </div>
+          </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-        <Card className="lg:col-span-2 bg-slate-900/40 border-slate-800 p-8 flex flex-col justify-center relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-8 opacity-10">
-            <Crown size={120} />
+      {/* Main Highlights Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Subscription & Account Status */}
+        <div className="lg:col-span-2 rounded-3xl bg-slate-900/40 border border-white/[0.08] backdrop-blur-2xl p-8 relative overflow-hidden shadow-2xl flex flex-col justify-between">
+          <div className="absolute top-0 right-0 p-8 opacity-[0.04] pointer-events-none">
+            <Crown size={160} />
           </div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2 mb-2">
-            <Shield className="text-cyan-400" /> Subscription Status
-          </h2>
-          <p className="text-slate-400 mb-8 max-w-md">Manage your account tier to unlock higher limits and faster processing speeds.</p>
 
-          <div className="flex flex-col md:flex-row gap-6">
-            <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700/50 flex-1">
-              <div className="text-sm text-slate-400 mb-1">Current Tier</div>
-              <div className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
-                {currentRole}
-              </div>
+          <div>
+            <div className="flex items-center gap-2.5 text-xs font-extrabold text-cyan-400 uppercase tracking-widest mb-2">
+              <Shield size={16} /> Status Akun & Lisensi
             </div>
-            <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700/50 flex-1">
-              <div className="text-sm text-slate-400 mb-1">Expiration Date</div>
-              <div className="text-2xl font-bold text-white mt-1">
-                {currentRole === 'Free' ? 'Lifetime' : expireDate}
+            <h2 className="text-2xl font-black text-white tracking-tight mb-2">
+              Subscription Status
+            </h2>
+            <p className="text-sm text-slate-400 max-w-md leading-relaxed mb-6">
+              Kelola status tier Anda untuk mendapatkan batas upload tak terbatas dan akselerasi transcoding audio.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.06] backdrop-blur-md">
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Paket Aktif</div>
+                <div className="text-2xl font-black bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">
+                  {currentRole}
+                </div>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.06] backdrop-blur-md">
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Masa Berlaku</div>
+                <div className="text-2xl font-black text-white">
+                  {currentRole === 'Free' ? 'Lifetime Access' : expireDate}
+                </div>
               </div>
             </div>
           </div>
 
           {currentRole === 'Free' && (
-            <div className="mt-8 p-6 rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/5 border border-amber-500/20 relative overflow-hidden group">
-              <div className="absolute -right-4 -top-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
-                <Sparkles size={100} className="text-amber-400" />
-              </div>
-              <div className="relative z-10">
-                <h3 className="text-lg font-bold text-amber-400 flex items-center gap-2 mb-2">
-                  <Crown size={20} /> Upgrade to Pro Plan
-                </h3>
-                <p className="text-sm text-slate-300 mb-6 max-w-lg leading-relaxed">
-                  You are currently on the <span className="font-bold text-white">Free Plan</span>.
-                  Unlock bulk imports, unlimited uploads, and priority processing to supercharge your workflow.
-                </p>
+            <div className="mt-8 p-6 rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/5 border border-amber-500/20 relative overflow-hidden">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-base font-bold text-amber-400 flex items-center gap-2">
+                    <Crown size={18} /> Upgrade ke Pro Plan
+                  </h3>
+                  <p className="text-xs text-slate-300 mt-1 max-w-md">
+                    Buka upload tak terbatas, bulk import YouTube & local, dan prioritas antrean.
+                  </p>
+                </div>
                 <Button
                   onClick={() => window.open('https://discord.gg/2dRtqgmKPR', '_blank')}
-                  className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-black font-black px-8 h-12 rounded-xl shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
+                  className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-black font-extrabold px-6 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
                 >
                   Upgrade via Discord
                 </Button>
               </div>
             </div>
           )}
-        </Card>
+        </div>
 
-        <Card className="bg-slate-900/40 border-slate-800 p-6 space-y-6 flex flex-col">
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center">
-                <Sparkles className="text-indigo-400" />
+        {/* Benefits & Quick Actions Sidebar */}
+        <div className="space-y-6">
+          {/* Pro Benefits Card */}
+          <div className="rounded-3xl bg-slate-900/40 border border-white/[0.08] backdrop-blur-2xl p-6 shadow-xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                <Sparkles size={20} />
               </div>
-              <h3 className="font-bold text-white text-lg">Upgrade to Pro Plan</h3>
+              <div>
+                <h3 className="font-extrabold text-white text-base">Studio Features</h3>
+                <p className="text-xs text-slate-400">Teknologi transcoding Roblox</p>
+              </div>
             </div>
-            <p className="text-sm text-slate-400 leading-relaxed mb-6">
-              Upgrade your benefit and you can join our <span className='text-cyan-400'>Discord</span> server!
-            </p>
 
-            {currentRole === 'Free' && (
-              <div className="space-y-4 p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10 mb-6">
-                <div className="text-lg font-bold text-indigo-400 uppercase tracking-wider mb-2">Pro Plan Benefits:</div>
-                <ul className="space-y-2">
-                  {[
-                    "Realtime update status asset",
-                    "Optimized Audio Enhanced",
-                    "Bulk Imports (YT/Local)",
-                    "Unlimited Uploads",
-                    "Priority Queue Download",
-                    "Bulk Audio Editor",
-                    "Auto Collab (Soon)"
-                  ].map((benefit, i) => (
-                    <li key={i} className="text-[15px] text-slate-300 flex items-center gap-2">
-                      <Zap size={10} className="text-indigo-400" /> {benefit}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <ul className="space-y-2.5 pt-2">
+              {[
+                "Roblox DataStore Migration & Backup",
+                "Real-time Moderation Tracking",
+                "High Quality OGG Audio Transcoder",
+                "YouTube Audio Extraction (No Loss)",
+                "Bulk Audio Auto-Namer & Formatter"
+              ].map((benefit, i) => (
+                <li key={i} className="text-xs text-slate-300 flex items-center gap-2.5 font-medium">
+                  <div className="w-4 h-4 rounded-md bg-cyan-500/15 flex items-center justify-center shrink-0">
+                    <Zap size={10} className="text-cyan-400" />
+                  </div>
+                  <span>{benefit}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-        </Card>
 
-        <Card className="bg-slate-900/40 border-slate-800 p-6 space-y-4">
-          <h3 className="font-bold text-white mb-4">Quick Links</h3>
-          <div className="space-y-2">
-            <button className="w-full text-left p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors text-sm text-slate-300">
-              Roblox Creator Dashboard
-            </button>
-            <button
-              onClick={() => window.open('https://discord.gg/2dRtqgmKPR', '_blank')}
-              className="w-full text-left p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors text-sm text-slate-300"
-            >
-              Community Discord
-            </button>
-            <button className="w-full text-left p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors text-sm text-slate-300">
-              Developer API Docs
-            </button>
+          {/* Quick External Links */}
+          <div className="rounded-3xl bg-slate-900/40 border border-white/[0.08] backdrop-blur-2xl p-6 shadow-xl space-y-3">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Pintasan Cepat</h4>
+            <div className="space-y-2">
+              <a
+                href="https://create.roblox.com/dashboard/creations"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.06] text-xs font-semibold text-slate-300 hover:text-white transition-all group"
+              >
+                <span>Roblox Creator Hub</span>
+                <span className="text-slate-500 group-hover:text-cyan-400 transition-colors">↗</span>
+              </a>
+
+              <a
+                href="https://discord.gg/2dRtqgmKPR"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-xs font-semibold text-indigo-300 hover:text-white transition-all group"
+              >
+                <span>Discord Community Server</span>
+                <span className="text-indigo-400 group-hover:text-white transition-colors">↗</span>
+              </a>
+            </div>
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );

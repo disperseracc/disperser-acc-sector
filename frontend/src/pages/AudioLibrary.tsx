@@ -233,32 +233,43 @@ export default function AudioLibrary() {
         <title>Audio Library | Disperser Studio</title>
       </Helmet>
       {/* Stats Header */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl backdrop-blur-sm">
-          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Assets</div>
-          <div className="text-2xl font-bold text-white flex items-center gap-2">
-            <Music className="text-cyan-500" size={20} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-3xl bg-slate-900/40 hover:bg-slate-900/60 border border-white/[0.08] hover:border-cyan-500/30 backdrop-blur-2xl p-5 transition-all shadow-xl">
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Assets</div>
+          <div className="text-2xl font-black text-white flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400">
+              <Music size={18} />
+            </div>
             {stats.total}
           </div>
         </div>
-        <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl backdrop-blur-sm">
-          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Approved</div>
-          <div className="text-2xl font-bold text-emerald-400 flex items-center gap-2">
-            <CheckCircle2 size={20} />
+
+        <div className="rounded-3xl bg-slate-900/40 hover:bg-slate-900/60 border border-white/[0.08] hover:border-emerald-500/30 backdrop-blur-2xl p-5 transition-all shadow-xl">
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Approved</div>
+          <div className="text-2xl font-black text-emerald-400 flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+              <CheckCircle2 size={18} />
+            </div>
             {stats.approved}
           </div>
         </div>
-        <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl backdrop-blur-sm">
-          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Rejected</div>
-          <div className="text-2xl font-bold text-red-400 flex items-center gap-2">
-            <X size={20} />
+
+        <div className="rounded-3xl bg-slate-900/40 hover:bg-slate-900/60 border border-white/[0.08] hover:border-rose-500/30 backdrop-blur-2xl p-5 transition-all shadow-xl">
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Rejected</div>
+          <div className="text-2xl font-black text-rose-400 flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400">
+              <X size={18} />
+            </div>
             {stats.rejected}
           </div>
         </div>
-        <div className="bg-slate-900/40 border border-slate-800 p-4 rounded-xl backdrop-blur-sm">
-          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Pending/Error</div>
-          <div className="text-2xl font-bold text-amber-400 flex items-center gap-2">
-            <Clock size={20} />
+
+        <div className="rounded-3xl bg-slate-900/40 hover:bg-slate-900/60 border border-white/[0.08] hover:border-amber-500/30 backdrop-blur-2xl p-5 transition-all shadow-xl">
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pending/Error</div>
+          <div className="text-2xl font-black text-amber-400 flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400">
+              <Clock size={18} />
+            </div>
             {stats.pending}
           </div>
         </div>
@@ -266,70 +277,84 @@ export default function AudioLibrary() {
 
       {/* Main Header & Search */}
       {!loadingConfig && !hasConfig && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 backdrop-blur-xl p-4 flex items-center gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
           <AlertCircle className="text-amber-400 shrink-0" size={20} />
-          <p className="text-sm text-amber-200/80">
-            <span className="font-bold text-amber-400">Warning:</span> You haven't configured your Roblox API Key & User ID yet. Upload features will not work until setup is completed in the Settings menu.
+          <p className="text-xs text-amber-200/90 leading-relaxed">
+            <strong className="text-amber-400">Konfigurasi Dibutuhkan:</strong> Roblox API Key & User ID belum diatur. Fitur upload membutuhkan kredensial di menu Pengaturan.
           </p>
         </div>
       )}
 
-      <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl backdrop-blur-sm space-y-6">
+      <div className="rounded-3xl bg-slate-900/40 border border-white/[0.08] backdrop-blur-2xl p-6 shadow-2xl space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-white">Audio Assets</h2>
-            <p className="text-sm text-slate-500">Manage and track your audio library.</p>
+            <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+              <Sparkles size={20} className="text-cyan-400" />
+              Audio Assets Library
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">Kelola dan pantau moderasi seluruh audio Roblox Anda.</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 shrink-0">
-              <span className="text-[11px] text-slate-500 font-medium px-2 hidden sm:inline">Target Upload:</span>
+            {/* Target Switcher */}
+            <div className="flex items-center gap-1 bg-white/[0.03] p-1 rounded-2xl border border-white/[0.08] backdrop-blur-md shrink-0">
+              <span className="text-[10px] text-slate-500 font-extrabold uppercase px-2 hidden sm:inline">Target:</span>
               <button
                 type="button"
                 onClick={() => setUploadTarget('user')}
                 title={userId ? `Upload to Personal (ID: ${userId})` : 'User ID belum diatur'}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${uploadTarget === 'user'
-                    ? 'bg-cyan-600 text-white shadow-sm'
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  uploadTarget === 'user'
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/20'
                     : 'text-slate-400 hover:text-white'
-                  }`}
+                }`}
               >
-                <User size={12} />
+                <User size={13} />
                 <span>Personal</span>
               </button>
               <button
                 type="button"
                 onClick={() => setUploadTarget('group')}
                 title={groupId ? `Upload to Group (ID: ${groupId})` : 'Group ID belum diatur'}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${uploadTarget === 'group'
-                    ? 'bg-cyan-600 text-white shadow-sm'
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  uploadTarget === 'group'
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/20'
                     : 'text-slate-400 hover:text-white'
-                  }`}
+                }`}
               >
-                <Users size={12} />
+                <Users size={13} />
                 <span>Group</span>
               </button>
             </div>
 
+            {/* Search Input */}
             <div className="relative flex-1 md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={15} />
               <Input
-                placeholder="Search assets..."
+                placeholder="Cari nama asset..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 bg-slate-950 border-slate-800 focus-visible:ring-cyan-500/50"
+                className="pl-9 h-10 rounded-xl bg-white/[0.03] border-white/[0.08] text-white text-xs placeholder:text-slate-500 focus-visible:ring-cyan-500/40"
               />
             </div>
-            <Button variant="outline" size="icon" onClick={() => refresh()} disabled={loading} className="border-slate-800 bg-slate-950 hover:bg-slate-800">
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refresh()}
+              disabled={loading}
+              className="h-10 w-10 rounded-xl border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.08] text-white"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
             </Button>
           </div>
         </div>
 
         {/* Table */}
-        <div className="rounded-xl border border-slate-800 bg-slate-950 overflow-x-auto">
+        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.01] backdrop-blur-xl overflow-x-auto">
           <Table>
-            <TableHeader className="bg-slate-900/60">
-              <TableRow className="border-slate-800">
+            <TableHeader className="bg-white/[0.03]">
+              <TableRow className="border-b border-white/[0.08] hover:bg-transparent">
                 <TableHead className="w-12 px-4">
                   <Checkbox
                     checked={
@@ -339,10 +364,10 @@ export default function AudioLibrary() {
                     onCheckedChange={toggleSelectAll}
                   />
                 </TableHead>
-                <TableHead className="text-slate-300">Asset Details</TableHead>
-                <TableHead className="text-slate-300">Status</TableHead>
-                <TableHead className="text-slate-300">Roblox ID</TableHead>
-                <TableHead className="text-right text-slate-300">Actions</TableHead>
+                <TableHead className="text-slate-300 font-bold text-xs uppercase tracking-wider">Asset Details</TableHead>
+                <TableHead className="text-slate-300 font-bold text-xs uppercase tracking-wider">Status</TableHead>
+                <TableHead className="text-slate-300 font-bold text-xs uppercase tracking-wider">Roblox ID</TableHead>
+                <TableHead className="text-right text-slate-300 font-bold text-xs uppercase tracking-wider">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -495,52 +520,52 @@ export default function AudioLibrary() {
         </div>
       </div>
 
-      {/* Bulk Action Bar */}
+      {/* Floating Glassmorphic Bulk Action Dock */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-50 animate-in slide-in-from-bottom-8">
-          <div className="bg-slate-900/90 border border-cyan-500/30 backdrop-blur-md p-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4">
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-50 animate-in slide-in-from-bottom-8 duration-300">
+          <div className="glass-dock p-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 bg-cyan-500/10 rounded-xl flex items-center justify-center">
-                <CheckSquare className="text-cyan-400" size={20} />
+              <div className="h-10 w-10 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 rounded-2xl flex items-center justify-center text-cyan-300 shadow-md shadow-cyan-500/10">
+                <CheckSquare size={18} />
               </div>
               <div>
-                <div className="text-sm font-bold text-white">{selectedIds.size} Assets Selected</div>
-                <div className="text-[10px] text-slate-400">Apply actions to all selected items</div>
+                <div className="text-sm font-black text-white">{selectedIds.size} Assets Terpilih</div>
+                <div className="text-[11px] text-slate-400">Pilih tindakan massal untuk aset terpilih</div>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               <Button
                 onClick={() => handleOpenFormatModal(items.filter(i => selectedIds.has(i.id)))}
-                className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs px-4 h-10 gap-2 shadow-lg shadow-cyan-500/20 font-bold shrink-0"
+                className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs px-4 h-10 gap-2 shadow-lg shadow-cyan-500/20 font-bold shrink-0 rounded-xl cursor-pointer"
               >
-                <Sparkles size={16} />
+                <Sparkles size={14} />
                 <span>Format Lua</span>
               </Button>
 
               {currentRole === 'Free' ? (
                 <Button
                   disabled
-                  className="bg-slate-800 text-slate-500 text-xs px-4 h-10 gap-2 cursor-not-allowed"
+                  className="bg-white/5 border border-white/10 text-slate-500 text-xs px-4 h-10 gap-2 cursor-not-allowed rounded-xl"
                   title="Bulk Upload is a Pro feature"
                 >
-                  <CloudUpload size={16} />
-                  <span>Upload (Pro Only)</span>
+                  <CloudUpload size={14} />
+                  <span>Upload (Pro)</span>
                 </Button>
               ) : (
                 <Button
                   onClick={handleBulkUpload}
                   disabled={isBulkUploading}
-                  className="bg-slate-800 hover:bg-slate-700 text-white text-xs px-4 h-10 gap-2"
+                  className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs px-4 h-10 gap-2 rounded-xl font-bold cursor-pointer transition-all"
                 >
                   {isBulkUploading ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Uploading {bulkProgress}/{selectedIds.size}...</span>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>{bulkProgress}/{selectedIds.size} Uploading...</span>
                     </>
                   ) : (
                     <>
-                      <CloudUpload size={16} />
+                      <CloudUpload size={14} />
                       <span>Upload to Roblox</span>
                     </>
                   )}
@@ -549,18 +574,20 @@ export default function AudioLibrary() {
 
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="ghost" className="h-10 px-3 text-slate-400 hover:text-red-400 hover:bg-red-500/10">
-                    <Trash2 size={18} />
+                  <Button variant="ghost" className="h-10 px-3 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl">
+                    <Trash2 size={16} />
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent className="bg-slate-900 border-slate-800">
+                <AlertDialogContent className="rounded-3xl bg-slate-900/90 border border-white/15 backdrop-blur-3xl shadow-2xl">
                   <AlertDialogHeader>
-                    <AlertDialogTitle className="text-white">Delete {selectedIds.size} assets?</AlertDialogTitle>
-                    <AlertDialogDescription className="text-slate-400">Permanently remove all selected items from library?</AlertDialogDescription>
+                    <AlertDialogTitle className="text-white text-lg font-bold">Hapus {selectedIds.size} aset terpilih?</AlertDialogTitle>
+                    <AlertDialogDescription className="text-slate-400 text-xs">
+                      Aset terpilih akan dihapus secara permanen dari library audio.
+                    </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel className="bg-slate-800 border-slate-700 text-slate-300">Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleBulkDelete} className="bg-red-600 text-white">Delete All</AlertDialogAction>
+                    <AlertDialogCancel className="bg-slate-800 border-white/10 text-slate-300 rounded-xl">Batal</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleBulkDelete} className="bg-rose-600 hover:bg-rose-500 text-white rounded-xl">Hapus Semua</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -569,9 +596,9 @@ export default function AudioLibrary() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setSelectedIds(new Set())}
-                className="h-8 w-8 text-slate-500 hover:text-white"
+                className="h-8 w-8 text-slate-400 hover:text-white rounded-xl"
               >
-                <X size={18} />
+                <X size={16} />
               </Button>
             </div>
           </div>
@@ -593,17 +620,17 @@ export default function AudioLibrary() {
 
 const ActivityLogs = React.memo(({ logs, onClear }: { logs: any[], onClear: () => void }) => {
   return (
-    <div className="mt-8 rounded-lg border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-4">
+    <div className="mt-8 rounded-3xl border border-white/[0.08] bg-slate-900/40 backdrop-blur-2xl p-6 shadow-xl">
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
-          <h3 className="text-sm font-semibold text-white">Activity Logs</h3>
+        <div className="flex items-center gap-2.5">
+          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+          <h3 className="text-xs font-bold text-white uppercase tracking-wider">System Activity Logs</h3>
         </div>
         <Button
           variant="ghost"
           size="sm"
           onClick={onClear}
-          className="h-7 text-xs text-slate-400 hover:text-white"
+          className="h-8 text-xs text-slate-400 hover:text-white rounded-xl border border-white/5 hover:bg-white/5"
         >
           Clear Logs
         </Button>
