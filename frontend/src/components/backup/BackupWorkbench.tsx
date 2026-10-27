@@ -43,7 +43,6 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
   const [conflict, setConflict] = useState<'skip' | 'overwrite'>('skip');
   const [skipUnchanged, setSkipUnchanged] = useState(true);
   const [readback, setReadback] = useState(false);
-  const [confirmationInput, setConfirmationInput] = useState({ scope: '', value: '' });
   const [seenSuggestion, setSeenSuggestion] = useState(suggestion);
   const [handles, setHandles] = useState<BackupHandle[]>(() => readHistory(storageKey));
   const [restoreId, setRestoreId] = useState('');
@@ -59,10 +58,8 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
   const signature = JSON.stringify([sourceUniverse, sourceKey, selectedStores]);
   const completed = handles.filter(h => h.job.captureComplete);
   const restoreSource = completed.find(h => h.id === (restoreId || completed[0]?.id));
-  const confirmationScope = JSON.stringify([targetUniverse, mode, conflict, mode === 'restore' ? restoreSource?.id : '']);
-  const confirmation = confirmationInput.scope === confirmationScope ? confirmationInput.value : '';
-  const setConfirmation = (value: string) => setConfirmationInput({ scope: confirmationScope, value });
   const selected = handles.find(h => h.id === selectedId) || handles[0];
+  const experienceName = (id?: string, saved?: string) => saved || experiences.find(e => String(e.id) === id)?.name || (id ? 'Universe ' + id : 'Experience tidak diketahui');
   const effectiveTargetKey = mode === 'migrate' && reuseKey ? sourceKey : targetKey;
 
   useEffect(() => { handlesRef.current = handles; }, [handles]);
@@ -114,8 +111,8 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
     try { await action(); } catch (err) { setError(err instanceof Error ? err.message : 'Proses gagal.'); }
     finally { setBusy(''); }
   }
-  function remember(result: { job: BackupJobView; token: string }) {
-    const handle = { id: result.job.id, token: result.token, job: result.job };
+  function remember(result: { job: BackupJobView; token: string }, names?: { sourceName?: string; targetName?: string }) {
+    const handle: BackupHandle = { id: result.job.id, token: result.token, job: result.job, ...names };
     const history = [handle, ...handlesRef.current.filter(h => h.id !== handle.id)];
     try { localStorage.setItem(storageKey, JSON.stringify(history)); }
     catch { setError('Simpan file backup sebelum menutup halaman: riwayat browser tidak dapat ditulis.'); }
@@ -166,15 +163,15 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
         ...(mode === 'restore'
           ? { backupJobId: restoreSource?.id, backupToken: restoreSource?.token }
           : { sourceUniverseId: sourceUniverse.trim(), sourceKey: sourceKey.trim(), stores: selectedStores }),
-        ...(mode === 'backup' ? {} : { targetUniverseId: targetUniverse.trim(), targetKey: effectiveTargetKey.trim(), confirmedTarget: confirmation.trim() })
+        ...(mode === 'backup' ? {} : { targetUniverseId: targetUniverse.trim(), targetKey: effectiveTargetKey.trim(), confirmedTarget: targetUniverse.trim() })
       };
       const result = await backupApi.create(input);
       if (mode !== 'backup') setTargetKey(effectiveTargetKey);
-      remember(result);
+      remember(result, { sourceName: mode === 'restore' ? restoreSource?.sourceName : experiences.find(e => String(e.id) === sourceUniverse)?.name, targetName: experiences.find(e => String(e.id) === targetUniverse)?.name });
     });
   }
   const canStart = !busy && (mode === 'restore' ? !!restoreSource : /^[1-9]\d*$/.test(sourceUniverse.trim()) && !!sourceKey.trim() && selectedStores.length > 0)
-    && (mode === 'backup' || (/^[1-9]\d*$/.test(targetUniverse.trim()) && !!effectiveTargetKey.trim() && confirmation.trim() === targetUniverse.trim()
+    && (mode === 'backup' || (/^[1-9]\d*$/.test(targetUniverse.trim()) && !!effectiveTargetKey.trim()
       && (mode !== 'migrate' || targetUniverse.trim() !== sourceUniverse.trim())));
   const job = selected?.job;
   const progress = job?.status === 'completed' ? 100 : job?.captureComplete && job.total ? Math.min(100, Math.round(job.processed / job.total * 100)) : null;
@@ -191,9 +188,11 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
           <h2 className="flex items-center gap-2 text-xl font-bold text-white"><ShieldCheck size={22} className="text-cyan-400" /> Data backup & recovery</h2>
           <p className="mt-1 text-xs leading-relaxed text-slate-400">Simpan data pemain, salin ke experience lain, atau pulihkan file backup.</p>
         </div>
-        <div className="flex rounded-xl border border-white/10 bg-slate-900/80 p-1" role="tablist" aria-label="Mode backup">
-          {(['backup', 'migrate', 'restore'] as const).map(value => (
-            <button key={value} role="tab" aria-selected={mode === value} onClick={() => setMode(value)} className={'rounded-lg px-3 py-2 text-xs font-bold ' + (mode === value ? 'bg-cyan-500/20 text-cyan-200' : 'text-slate-400 hover:text-white')}>{modeLabels[value]}</button>
+        <div className="grid w-full gap-2 sm:grid-cols-3" role="tablist" aria-label="Pilih tindakan backup">
+          {([['backup', 'Simpan backup', 'Simpan data experience'], ['migrate', 'Pindahkan data', 'Dari experience A ke B'], ['restore', 'Pulihkan backup', 'Dari backup tersimpan']] as const).map(([value, title, description]) => (
+            <button key={value} role="tab" aria-selected={mode === value} onClick={() => setMode(value)} className={'rounded-2xl border p-3 text-left transition ' + (mode === value ? 'border-cyan-400 bg-cyan-500/20 text-white shadow-lg shadow-cyan-500/10' : 'border-white/10 bg-slate-900/60 text-slate-300 hover:border-cyan-500/40')}>
+              <span className="block text-sm font-bold">{title}</span><span className="mt-1 block text-[11px] opacity-70">{description}</span>
+            </button>
           ))}
         </div>
       </div>
@@ -205,7 +204,7 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
           <div className="space-y-4 rounded-2xl border border-white/10 bg-slate-900/40 p-4">
             <h3 className="text-sm font-bold text-white">A · Experience sumber</h3>
             <label className="block space-y-1.5 text-xs text-slate-400">
-              <span>Pilih dari experience yang sudah dimuat</span>
+              <span>Pilih experience</span>
               <select aria-label="Pilih experience sumber" className={field} value={experiences.some(e => String(e.id) === sourceUniverse) ? sourceUniverse : ''} onChange={e => chooseExperience(e.target.value, false)}>
                 <option value="">Pilih experience atau masukkan Universe ID di bawah</option>
                 {experiences.map(e => <option key={e.id} value={e.id}>{e.name} · {e.id}</option>)}
@@ -220,9 +219,9 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
               <span>Open Cloud API key sumber</span>
               <input className={field} aria-label="API key sumber" type="password" autoComplete="off" value={sourceKey} onChange={e => { setSourceKey(e.target.value); }} placeholder="Izin list + read DataStore" />
             </label>
-            <button className={primary} disabled={!!busy || !sourceUniverse || !sourceKey} onClick={loadStores}>{busy === 'stores' ? <LoaderCircle size={15} className="animate-spin" /> : <Database size={15} />} Muat Standard DataStore</button>
+            <button className={primary} disabled={!!busy || !sourceUniverse || !sourceKey} onClick={loadStores}>{busy === 'stores' ? <LoaderCircle size={15} className="animate-spin" /> : <Database size={15} />} Pilih data otomatis</button><p className="text-[11px] text-slate-400">{selectedStores.length ? `${selectedStores.length} store dipilih. ` : ''}DataStore standar ditemukan otomatis. OrderedDataStore ditambahkan lewat pengaturan lanjutan.</p>
 
-            <div className="space-y-2 border-t border-white/10 pt-4">
+            <details className="space-y-2 border-t border-white/10 pt-4"><summary className="cursor-pointer text-xs font-bold text-cyan-300">Pengaturan lanjutan · pilih store dan scope</summary>
               <div className="flex items-center justify-between text-xs">
                 <span className="font-bold text-slate-200">Store terpilih ({selectedStores.length})</span>
                 {choices.length > 0 && <button className="text-cyan-300" onClick={() => setChoices(current => current.map(s => ({ ...s, selected: !current.every(c => c.selected) })))}>Pilih / batalkan semua</button>}
@@ -242,7 +241,6 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
                 {!choices.length && <p className="rounded-xl border border-dashed border-white/10 p-4 text-xs text-slate-500">Muat daftar Standard DataStore atau tambahkan nama store di bawah.</p>}
               </div>
               <p className="text-[11px] leading-relaxed text-slate-500">Scope * mencakup semua scope Standard. Untuk OrderedDataStore, masukkan nama persis dari script dan scope yang digunakan, satu per baris pilihan.</p>
-            </div>
 
             <div className="space-y-2">
               <div className="grid grid-cols-[1fr_1fr] gap-2 sm:grid-cols-[1fr_1.3fr_0.8fr_auto]">
@@ -258,6 +256,7 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
                 {tested === signature ? 'Sampel akses sumber berhasil' : 'Uji akses sumber'}
               </button>
             </div>
+            </details>
           </div>
         ) : (
           <div className="space-y-4 rounded-2xl border border-white/10 bg-slate-900/40 p-4">
@@ -265,11 +264,11 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
             <p className="text-xs leading-relaxed text-slate-400">Gunakan backup lengkap yang tersimpan di backend atau upload file backup Disperser.</p>
             <select className={field} aria-label="Pilih backup untuk restore" value={restoreSource?.id || ''} onChange={e => setRestoreId(e.target.value)}>
               {!completed.length && <option value="">Belum ada backup lengkap</option>}
-              {completed.map(h => <option key={h.id} value={h.id}>{h.job.sourceUniverseId} · {h.job.captured.toLocaleString()} key · {new Date(h.job.createdAt).toLocaleString('id-ID')}</option>)}
+              {completed.map(h => <option key={h.id} value={h.id}>{experienceName(h.job.sourceUniverseId, h.sourceName)} · {h.job.captured.toLocaleString()} key · {new Date(h.job.createdAt).toLocaleString('id-ID')}</option>)}
             </select>
             {restoreSource && <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4 text-sm text-cyan-200">
               <p className="font-bold">{restoreSource.job.captured.toLocaleString()} key tersedia</p>
-              <p className="mt-1 text-xs text-slate-400">{restoreSource.job.stores.length} pilihan store/scope · sumber {restoreSource.job.sourceUniverseId}</p>
+              <p className="mt-1 text-xs text-slate-400">{restoreSource.job.stores.length} pilihan store/scope · sumber {experienceName(restoreSource.job.sourceUniverseId, restoreSource.sourceName)} ({restoreSource.job.sourceUniverseId})</p>
             </div>}
             <input ref={uploadInput} type="file" accept=".gz,.jsonl,application/gzip,application/x-ndjson" className="hidden" aria-label="Upload file backup" onChange={e => {
               const file = e.target.files?.[0]; e.target.value = '';
@@ -286,7 +285,7 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
           <div className="space-y-4 rounded-2xl border border-white/10 bg-slate-900/40 p-4">
             <h3 className="text-sm font-bold text-white">B · Experience tujuan</h3>
             <label className="block space-y-1.5 text-xs text-slate-400">
-              <span>Pilih dari experience yang sudah dimuat</span>
+              <span>Pilih experience</span>
               <select aria-label="Pilih experience tujuan" className={field} value={experiences.some(e => String(e.id) === targetUniverse) ? targetUniverse : ''} onChange={e => chooseExperience(e.target.value, true)}>
                 <option value="">Pilih experience atau masukkan Universe ID di bawah</option>
                 {experiences.map(e => <option key={e.id} value={e.id}>{e.name} · {e.id}</option>)}
@@ -299,6 +298,7 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
               <input className={field} aria-label="API key tujuan" type="password" autoComplete="off" disabled={mode === 'migrate' && reuseKey} value={effectiveTargetKey} onChange={e => setTargetKey(e.target.value)} />
               <span className="block leading-relaxed">API key harus punya akses ke Universe B. Gunakan key berbeda jika sumber dan tujuan berada di pemilik/group berbeda.</span>
             </label>
+            <details className="space-y-3 border-t border-white/10 pt-3"><summary className="cursor-pointer text-xs font-bold text-cyan-300">Pengaturan lanjutan · data yang sudah ada dan verifikasi</summary>
             <label className="block space-y-1.5 text-xs text-slate-400">
               <span>Jika key sudah ada di tujuan</span>
               <select className={field} aria-label="Kebijakan key yang sudah ada" value={conflict} onChange={e => setConflict(e.target.value as 'skip' | 'overwrite')}>
@@ -308,28 +308,28 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
             </label>
             {conflict === 'overwrite' && <label className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" className="accent-cyan-400" checked={skipUnchanged} onChange={e => setSkipUnchanged(e.target.checked)} /> Lewati penulisan jika nilai dan metadata sudah sama</label>}
             <label className="flex items-start gap-2 text-xs leading-relaxed text-slate-300"><input type="checkbox" className="mt-0.5 accent-cyan-400" checked={readback} onChange={e => setReadback(e.target.checked)} /><span>Verifikasi tambahan dengan baca ulang. Memerlukan request ekstra; respons setiap penulisan selalu diperiksa.</span></label>
-            <label className="block space-y-1.5 text-xs text-slate-400">
-              <span>Ketik ulang Universe ID tujuan</span>
-              <input className={field} aria-label="Konfirmasi Universe ID tujuan" inputMode="numeric" value={confirmation} onChange={e => setConfirmation(e.target.value)} placeholder={targetUniverse || 'Universe ID B'} />
-            </label>
-            {conflict === 'overwrite' && <p className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-200">Key yang cocok akan ditimpa dengan data sumber. Pastikan penulisan dari game di tujuan sudah dihentikan selama pemulihan.</p>}
+            {conflict === 'overwrite' && <p className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-200">Key yang cocok akan ditimpa dengan data sumber. Pastikan penulisan dari game di tujuan sudah dihentikan selama pemulihan.</p>}</details>
           </div>
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+        <div className="w-full"><p className="text-xs font-bold uppercase tracking-wide text-cyan-300">Ringkasan</p><p className="mt-1 text-sm font-semibold text-white">{mode === 'backup' ? `Simpan backup ${experienceName(sourceUniverse)}` : mode === 'migrate' ? `${experienceName(sourceUniverse)} → ${experienceName(targetUniverse)}` : `${experienceName(restoreSource?.job.sourceUniverseId, restoreSource?.sourceName)} → ${experienceName(targetUniverse)}`}</p><p className="mt-1 text-xs text-slate-300">{mode === 'backup' ? `${selectedStores.length} store dipilih` : `Data yang sudah ada di tujuan akan ${conflict === 'skip' ? 'dilewati' : 'ditimpa'}.`}</p></div>
         <p className="max-w-2xl text-xs leading-relaxed text-slate-400">Yang disalin adalah nilai terkini dan metadata yang didukung, termasuk nilai leaderboard. Hentikan penulisan sumber untuk hasil konsisten; backup ini bukan snapshot atomik seluruh experience.</p>
-        <button className={primary + ' !px-5 !py-3'} disabled={!canStart} onClick={start}>{busy === 'start' ? <LoaderCircle className="animate-spin" size={16} /> : <ArrowRight size={16} />} {mode === 'backup' ? 'Mulai backup' : mode === 'migrate' ? 'Mulai migrasi' : 'Mulai restore'}</button>
+        <button className={'inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-xs font-extrabold transition shadow-lg disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none ' + (canStart ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-cyan-500/25 hover:from-cyan-300 hover:to-blue-400' : 'bg-slate-700 text-slate-300')} disabled={!canStart} onClick={start}>{busy === 'start' ? <LoaderCircle className="animate-spin" size={16} /> : <ArrowRight size={16} />} {mode === 'backup' ? 'Mulai backup' : mode === 'migrate' ? 'Mulai migrasi' : 'Mulai restore'}</button>
       </div>
 
       {!!handles.length && (
         <div className="space-y-4 border-t border-white/10 pt-5">
-          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-bold text-white">Proses & backup tersimpan</h3><p className="text-[11px] text-slate-500">Proses berjalan di backend meski halaman ditutup.</p></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-bold text-white">Proses backup & backup tersimpan</h3><p className="text-[11px] text-slate-500">Proses berjalan di backend meski halaman ditutup.</p></div>
           <div className="grid gap-3 lg:grid-cols-[minmax(180px,0.7fr)_minmax(0,1.5fr)]">
             <div className="max-h-80 space-y-2 overflow-y-auto">
               {handles.map(handle => <button key={handle.id} onClick={() => setSelectedId(handle.id)} className={'w-full rounded-xl border p-3 text-left ' + (selected?.id === handle.id ? 'border-cyan-500/40 bg-cyan-500/10' : 'border-white/10 bg-slate-950/30')}>
                 <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-200"><span>{modeLabels[handle.job.mode]}</span><span className={handle.job.status === 'completed' ? 'text-emerald-300' : 'text-cyan-300'}>{statusLabels[handle.job.status]}</span></div>
-                <p className="mt-1 truncate font-mono text-[11px] text-slate-400">{handle.job.sourceUniverseId}{handle.job.targetUniverseId ? ' → ' + handle.job.targetUniverseId : ''}</p>
+                <span className={'mt-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ' + (handle.job.captureComplete ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300')}>{handle.job.captureComplete ? 'Backup tersimpan' : 'Proses backup'}</span>
+                <p className="mt-2 truncate text-xs font-semibold text-slate-100" title={experienceName(handle.job.sourceUniverseId, handle.sourceName)}>{experienceName(handle.job.sourceUniverseId, handle.sourceName)}</p>
+                {handle.job.targetUniverseId && <p className="mt-0.5 truncate text-[11px] text-slate-300" title={experienceName(handle.job.targetUniverseId, handle.targetName)}>→ {experienceName(handle.job.targetUniverseId, handle.targetName)}</p>}
+                <p className="mt-1 truncate font-mono text-[10px] text-slate-500">{handle.job.sourceUniverseId}{handle.job.targetUniverseId ? ' → ' + handle.job.targetUniverseId : ''}</p>
                 <p className="mt-1 text-[10px] text-slate-500">{new Date(handle.job.createdAt).toLocaleString('id-ID')}</p>
               </button>)}
             </div>
@@ -339,7 +339,7 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
                 <h4 className="text-sm font-bold text-white">{modeLabels[job.mode]} · {statusLabels[job.status]}</h4>
                 <button className="text-slate-400 hover:text-cyan-200" aria-label="Perbarui status proses" onClick={() => { void perform('refresh', async () => { updateJob((await backupApi.status(selected)).job); setJobErrors(current => { const next = { ...current }; delete next[selected.id]; return next; }); }); }}><RefreshCw size={14} /></button>
               </div>
-              <p className="break-all font-mono text-xs text-slate-400">{job.sourceUniverseId}{job.targetUniverseId ? ' → ' + job.targetUniverseId : ''}</p>
+              <p className="text-sm font-semibold text-slate-100">{experienceName(job.sourceUniverseId, selected.sourceName)}{job.targetUniverseId ? ' → ' + experienceName(job.targetUniverseId, selected.targetName) : ''}</p><p className="break-all font-mono text-xs text-slate-400">{job.sourceUniverseId}{job.targetUniverseId ? ' → ' + job.targetUniverseId : ''}</p>
               <div className="h-2 overflow-hidden rounded-full bg-white/5" role="progressbar" aria-label="Progres backup" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress ?? undefined}>
                 <div className={'h-full rounded-full bg-cyan-400 transition-all ' + (progress === null && job.status === 'running' ? 'w-1/3 animate-pulse' : '')} style={progress === null ? undefined : { width: progress + '%' }} />
               </div>

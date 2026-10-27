@@ -10,7 +10,7 @@ export interface BackupJobView {
   pauseRequested: boolean; createdAt: string; updatedAt: string; currentStore?: string; error?: string;
   conflict: 'skip' | 'overwrite'; verifyReadback: boolean; skipUnchanged: boolean;
 }
-export interface BackupHandle { id: string; token: string; job: BackupJobView }
+export interface BackupHandle { id: string; token: string; job: BackupJobView; sourceName?: string; targetName?: string }
 export interface BackupCredentials { sourceKey?: string; targetKey?: string }
 export interface CreateBackup extends BackupCredentials {
   mode: BackupJobView['mode']; sourceUniverseId?: string; targetUniverseId?: string;

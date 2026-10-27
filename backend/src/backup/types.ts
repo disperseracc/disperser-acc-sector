@@ -62,7 +62,7 @@ export function validateEntry(value: any): BackupEntry {
   if (store.scope === '*') throw new BackupError('Entry backup harus memiliki scope tertentu.');
   const key = namePart(value.key, 'Key');
   if (containsTaggedNumber(value.value)) throw new BackupError('Entry berisi angka non-finite dari Luau. Migrasi dihentikan agar tipe data tidak berubah.');
-  if (!Object.prototype.hasOwnProperty.call(value, 'value') || value.value === undefined) throw new BackupError('Entry backup tidak memiliki nilai.');
+  if (!Object.prototype.hasOwnProperty.call(value, 'value') || value.value === undefined || value.value === null) throw new BackupError('Entry backup memiliki nilai kosong/null; Roblox tidak menerima nilai null untuk DataStore. Periksa key ' + store.name + '/' + store.scope + '/' + key + '.');
   if (store.kind === 'ordered' && !Number.isSafeInteger(value.value)) throw new BackupError('Nilai OrderedDataStore harus berupa integer yang aman untuk JSON/JavaScript.');
   if (value.users !== undefined && (!Array.isArray(value.users) || value.users.some((u: unknown) => typeof u !== 'string' || !/^users\/[1-9]\d*$/.test(u)))) throw new BackupError('Metadata users tidak valid.');
   if (value.attributes !== undefined && (!value.attributes || typeof value.attributes !== 'object' || Array.isArray(value.attributes))) throw new BackupError('Metadata attributes tidak valid.');
