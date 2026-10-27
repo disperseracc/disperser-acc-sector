@@ -342,5 +342,43 @@ export const api = {
     const key = localStorage.getItem('disperser_key');
     const res = await fetch(`${BASE_URL}/api/roblox/asset/${assetId}?apiKey=${encodeURIComponent(key || '')}`);
     return await res.json();
+  },
+
+  // --- Backup Server & Roblox Experiences API ---
+  async getCommunityExperiences(groupId: string, cursor?: string) {
+    const url = new URL(`${BASE_URL}/api/roblox/community/${groupId}/experiences`);
+    if (cursor) url.searchParams.set('cursor', cursor);
+    const res = await fetch(url.toString());
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to fetch community experiences');
+    }
+    return data;
+  },
+
+  async getUserExperiences(userId: string, cursor?: string) {
+    const url = new URL(`${BASE_URL}/api/roblox/user/${userId}/experiences`);
+    if (cursor) url.searchParams.set('cursor', cursor);
+    const res = await fetch(url.toString());
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to fetch creator experiences');
+    }
+    return data;
+  },
+
+  async getExperienceDataStores(universeId: string, apiKey?: string) {
+    const key = apiKey || localStorage.getItem('disperser_key') || '';
+    const url = new URL(`${BASE_URL}/api/roblox/experience/${universeId}/datastores`);
+    const res = await fetch(url.toString(), {
+      headers: {
+        'x-api-key': key
+      }
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to fetch DataStores list');
+    }
+    return data;
   }
 };

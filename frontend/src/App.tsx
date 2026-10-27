@@ -6,6 +6,7 @@ import Settings from './pages/Settings';
 import LandingPage from './pages/LandingPage';
 import AudioStudio from './pages/AudioStudio';
 import AudioLibrary from './pages/AudioLibrary';
+import BackupServer from './pages/BackupServer';
 import { PollProvider } from './context/PollContext';
 import { BulkUploadProvider, useBulkUpload } from './context/BulkUploadContext';
 import DiscordCallback from './pages/DiscordCallback';
@@ -22,7 +23,8 @@ import {
   Loader2, 
   MessageSquare,
   Menu,
-  X as CloseIcon
+  X as CloseIcon,
+  Database
 } from 'lucide-react';
 
 // --- Components ---
@@ -41,6 +43,7 @@ const Sidebar = ({ open, setOpen }: { open: boolean; setOpen: (o: boolean) => vo
     { name: 'Overview', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
     { name: 'Audio Studio', path: '/dashboard/studio', icon: <Sparkles size={20} /> },
     { name: 'Audio Library', path: '/dashboard/library', icon: <ListMusic size={20} /> },
+    { name: 'Backup Server', path: '/dashboard/backup', icon: <Database size={20} /> },
     { name: 'Upload Image', path: '/dashboard/image', icon: <ImageIcon size={20} /> },
     { name: 'Settings', path: '/dashboard/settings', icon: <SettingsIcon size={20} /> },
   ];
@@ -228,6 +231,7 @@ const DashboardLayout = ({ userExists }: { userExists: boolean }) => {
               <Route path="/" element={<Overview />} />
               <Route path="/studio" element={<AudioStudio />} />
               <Route path="/library" element={<AudioLibrary />} />
+              <Route path="/backup" element={<BackupServer />} />
               <Route path="/image" element={<UploadImage />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/" />} />

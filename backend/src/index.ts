@@ -801,6 +801,226 @@ app.get('/api/roblox/asset/:id', async (req, res) => {
   }
 });
 
+// --- Roblox Backup Server & Community Experiences Endpoints ---
+
+// 1. Fetch experiences under a Community / Group
+app.get('/api/roblox/community/:groupId/experiences', async (req, res) => {
+  const { groupId } = req.params;
+  const { cursor, limit = 50 } = req.query;
+
+  if (!groupId) {
+    return res.status(400).json({ success: false, error: 'Community (Group) ID is required' });
+  }
+
+  try {
+    // A. Fetch Group / Community metadata
+    const groupRes = await fetch(`https://groups.roblox.com/v1/groups/${groupId}`);
+    const groupData = await groupRes.json();
+
+    if (!groupRes.ok) {
+      const errMsg = groupData?.errors?.[0]?.userFacingMessage || groupData?.errors?.[0]?.message || 'Failed to fetch community info';
+      return res.status(groupRes.status).json({ success: false, error: errMsg });
+    }
+
+    // B. Fetch Group Icon
+    let groupIconUrl = '';
+    try {
+      const groupIconRes = await fetch(`https://thumbnails.roblox.com/v1/groups/icons?groupIds=${groupId}&size=150x150&format=Png`);
+      const groupIconData = await groupIconRes.json();
+      groupIconUrl = groupIconData?.data?.[0]?.imageUrl || '';
+    } catch (e) {
+      console.warn('Failed to fetch group icon:', e);
+    }
+
+    // C. Fetch Group Experiences
+    const numLimit = Number(limit);
+    const safeLimit = numLimit <= 10 ? 10 : (numLimit <= 25 ? 25 : 50);
+    const gamesUrl = `https://games.roblox.com/v2/groups/${groupId}/games?sortOrder=Desc&limit=${safeLimit}${cursor ? `&cursor=${encodeURIComponent(cursor as string)}` : ''}`;
+    const gamesRes = await fetch(gamesUrl);
+    const gamesData = await gamesRes.json();
+
+    if (!gamesRes.ok) {
+      const errMsg = gamesData?.errors?.[0]?.message || 'Failed to fetch community experiences';
+      return res.status(gamesRes.status).json({ success: false, error: errMsg });
+    }
+
+    const rawGames = gamesData.data || [];
+    const universeIds = rawGames.map((g: any) => g.id).filter(Boolean);
+
+    // D. Batch fetch experience icons
+    const iconMap: Record<number, string> = {};
+    if (universeIds.length > 0) {
+      try {
+        const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/games/icons?universeIds=${universeIds.join(',')}&returnPolicy=PlaceHolder&size=150x150&format=Png&isCircular=false`);
+        const thumbData = await thumbRes.json();
+        if (thumbData?.data) {
+          for (const item of thumbData.data) {
+            iconMap[item.targetId] = item.imageUrl;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch game thumbnails:', e);
+      }
+    }
+
+    // E. Assemble response
+    const experiences = rawGames.map((g: any) => ({
+      id: g.id,
+      name: g.name,
+      description: g.description || '',
+      rootPlaceId: g.rootPlace?.id || null,
+      created: g.created,
+      updated: g.updated,
+      placeVisits: g.placeVisits || 0,
+      iconUrl: iconMap[g.id] || null,
+    }));
+
+    res.json({
+      success: true,
+      community: {
+        id: groupData.id,
+        name: groupData.name,
+        description: groupData.description || '',
+        memberCount: groupData.memberCount || 0,
+        owner: groupData.owner || null,
+        iconUrl: groupIconUrl,
+        communityTier: groupData.communityTier || null,
+      },
+      experiences,
+      nextPageCursor: gamesData.nextPageCursor || null,
+      previousPageCursor: gamesData.previousPageCursor || null,
+    });
+  } catch (error: any) {
+    console.error('Error fetching community experiences:', error);
+    res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
+});
+
+// 2. Fetch experiences under a User / Creator
+app.get('/api/roblox/user/:userId/experiences', async (req, res) => {
+  const { userId } = req.params;
+  const { cursor, limit = 50 } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ success: false, error: 'User ID is required' });
+  }
+
+  try {
+    const userRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
+    const userData = await userRes.json();
+
+    if (!userRes.ok) {
+      const errMsg = userData?.errors?.[0]?.message || 'Failed to fetch user info';
+      return res.status(userRes.status).json({ success: false, error: errMsg });
+    }
+
+    let userIconUrl = '';
+    try {
+      const iconRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png`);
+      const iconData = await iconRes.json();
+      userIconUrl = iconData?.data?.[0]?.imageUrl || '';
+    } catch (e) {}
+
+    const numLimit = Number(limit);
+    const safeLimit = numLimit <= 10 ? 10 : (numLimit <= 25 ? 25 : 50);
+    const gamesUrl = `https://games.roblox.com/v2/users/${userId}/games?sortOrder=Desc&limit=${safeLimit}${cursor ? `&cursor=${encodeURIComponent(cursor as string)}` : ''}`;
+    const gamesRes = await fetch(gamesUrl);
+    const gamesData = await gamesRes.json();
+
+    if (!gamesRes.ok) {
+      const errMsg = gamesData?.errors?.[0]?.message || 'Failed to fetch user experiences';
+      return res.status(gamesRes.status).json({ success: false, error: errMsg });
+    }
+
+    const rawGames = gamesData.data || [];
+    const universeIds = rawGames.map((g: any) => g.id).filter(Boolean);
+
+    const iconMap: Record<number, string> = {};
+    if (universeIds.length > 0) {
+      try {
+        const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/games/icons?universeIds=${universeIds.join(',')}&returnPolicy=PlaceHolder&size=150x150&format=Png&isCircular=false`);
+        const thumbData = await thumbRes.json();
+        if (thumbData?.data) {
+          for (const item of thumbData.data) {
+            iconMap[item.targetId] = item.imageUrl;
+          }
+        }
+      } catch (e) {}
+    }
+
+    const experiences = rawGames.map((g: any) => ({
+      id: g.id,
+      name: g.name,
+      description: g.description || '',
+      rootPlaceId: g.rootPlace?.id || null,
+      created: g.created,
+      updated: g.updated,
+      placeVisits: g.placeVisits || 0,
+      iconUrl: iconMap[g.id] || null,
+    }));
+
+    res.json({
+      success: true,
+      creator: {
+        id: userData.id,
+        name: userData.name,
+        displayName: userData.displayName,
+        iconUrl: userIconUrl,
+      },
+      experiences,
+      nextPageCursor: gamesData.nextPageCursor || null,
+      previousPageCursor: gamesData.previousPageCursor || null,
+    });
+  } catch (error: any) {
+    console.error('Error fetching user experiences:', error);
+    res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
+});
+
+// 3. Inspect DataStores for an Experience (Universe) using Open Cloud API
+app.get('/api/roblox/experience/:universeId/datastores', async (req, res) => {
+  const { universeId } = req.params;
+  const apiKey = (req.headers['x-api-key'] || req.query.apiKey) as string;
+
+  if (!universeId) {
+    return res.status(400).json({ success: false, error: 'Universe ID is required' });
+  }
+  if (!apiKey) {
+    return res.status(400).json({ success: false, error: 'Open Cloud API Key is required to inspect DataStores' });
+  }
+
+  try {
+    const trimmedKey = apiKey.trim();
+    const prefix = (req.query.prefix as string) || '';
+    const cursor = (req.query.cursor as string) || '';
+    let url = `https://apis.roblox.com/datastores/v1/universes/${universeId}/standard-datastores?limit=50`;
+    if (prefix) url += `&prefix=${encodeURIComponent(prefix)}`;
+    if (cursor) url += `&cursor=${encodeURIComponent(cursor)}`;
+
+    const dsRes = await fetch(url, {
+      headers: { 'x-api-key': trimmedKey }
+    });
+
+    const dsData = await dsRes.json();
+    if (!dsRes.ok) {
+      return res.status(dsRes.status).json({
+        success: false,
+        error: dsData?.message || dsData?.errors?.[0]?.message || 'Failed to list DataStores. Ensure API key has DataStores permissions for this Universe.',
+        details: dsData
+      });
+    }
+
+    res.json({
+      success: true,
+      datastores: dsData.datastores || [],
+      nextPageCursor: dsData.nextPageCursor || null
+    });
+  } catch (error: any) {
+    console.error('Error inspecting DataStores:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to inspect DataStores' });
+  }
+});
+
 // --- YouTube Downloader (using yt-dlp + ffmpeg) ---
 
 app.get('/api/youtube/info', async (req, res) => {
