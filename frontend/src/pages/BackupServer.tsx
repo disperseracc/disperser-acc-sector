@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { 
   Database, 
@@ -14,10 +14,7 @@ import {
   ShieldCheck, 
   Server, 
   AlertCircle, 
-  ChevronRight, 
   Layers, 
-  Key, 
-  HardDriveDownload,
   Flame,
   ArrowUpDown
 } from 'lucide-react';
@@ -27,6 +24,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/api/api';
 import { useConfigStore } from '@/store/useConfigStore';
+import BackupWorkbench from '@/components/backup/BackupWorkbench';
 
 interface CommunityInfo {
   id: number | string;
@@ -81,12 +79,7 @@ export default function BackupServer() {
   // Copy helper
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Modal / DataStore Inspection state
-  const [inspectExp, setInspectExp] = useState<RobloxExperience | null>(null);
-  const [inspectLoading, setInspectLoading] = useState(false);
-  const [inspectError, setInspectError] = useState<string | null>(null);
-  const [datastoresList, setDatastoresList] = useState<any[]>([]);
-  const [inspectApiKey, setInspectApiKey] = useState(savedApiKey || localStorage.getItem('disperser_key') || '');
+  const [backupSource, setBackupSource] = useState<(RobloxExperience & { selectedAt: number }) | null>(null);
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -98,7 +91,7 @@ export default function BackupServer() {
     setLoading(true);
     setError(null);
     try {
-      if (targetType === 'community') {
+      if (overrideGroupId !== undefined || (overrideUserId === undefined && targetType === 'community')) {
         const targetGid = overrideGroupId ?? groupIdInput.trim();
         if (!targetGid) {
           throw new Error('Please enter a Community / Group ID first');
@@ -141,30 +134,6 @@ export default function BackupServer() {
       fetchExperiences(undefined, cleanUid);
     }
   }, []);
-
-  // Inspect DataStores Handler
-  const handleInspect = async (exp: RobloxExperience) => {
-    setInspectExp(exp);
-    setInspectLoading(true);
-    setInspectError(null);
-    setDatastoresList([]);
-
-    const key = inspectApiKey || savedApiKey || localStorage.getItem('disperser_key') || '';
-    if (!key) {
-      setInspectError('Open Cloud API Key is required to list DataStores. Add your key below or in Settings.');
-      setInspectLoading(false);
-      return;
-    }
-
-    try {
-      const res = await api.getExperienceDataStores(exp.id.toString(), key);
-      setDatastoresList(res.datastores || []);
-    } catch (err: any) {
-      setInspectError(err.message || 'Failed to query DataStores');
-    } finally {
-      setInspectLoading(false);
-    }
-  };
 
   // Filtered and sorted experiences
   const filteredExperiences = useMemo(() => {
@@ -209,7 +178,7 @@ export default function BackupServer() {
               Backup Server
             </h1>
             <p className="page-desc mt-1.5 text-slate-400 text-sm max-w-xl">
-              Jelajahi dan pilih experience di komunitas untuk backup DataStore & migrasi langsung via web.
+              Backup Standard dan OrderedDataStore, migrasi antar-experience, dan restore data melalui Roblox Open Cloud.
             </p>
           </div>
 
@@ -245,6 +214,8 @@ export default function BackupServer() {
           </div>
         </div>
       </div>
+
+      <BackupWorkbench experiences={experiences} suggestion={backupSource} initialKey={savedApiKey || localStorage.getItem('disperser_key') || ''} />
 
       {/* Target Source Input Bar */}
       <Card className="glass-panel rounded-3xl border border-white/[0.08] backdrop-blur-2xl shadow-2xl">
@@ -533,11 +504,11 @@ export default function BackupServer() {
               {/* Action Buttons */}
               <div className="p-4 pt-0 border-t border-white/[0.06] mt-2 flex items-center gap-2">
                 <Button
-                  onClick={() => handleInspect(exp)}
+                  onClick={() => { setBackupSource({ ...exp, selectedAt: Date.now() }); document.getElementById('backup-workbench')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
                   className="flex-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold text-xs py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 hover:border-cyan-400/50 shadow-sm"
                 >
                   <Database size={14} className="text-cyan-400" />
-                  <span>Inspect DataStores</span>
+                  <span>Backup & Migrasi</span>
                 </Button>
 
                 {exp.rootPlaceId && (
@@ -560,7 +531,7 @@ export default function BackupServer() {
           <Layers size={36} className="text-slate-500 mb-1" />
           <h3 className="text-lg font-bold text-white">Tidak ada Experience Ditemukan</h3>
           <p className="text-xs text-slate-400 max-w-md">
-            Komunitas ini belum mempublikasikan game atau place publik di Roblox. Pastikan status place diset Public di Creator Hub.
+            Tidak ada experience publik pada daftar ini. Untuk experience privat atau disuspend, masukkan Universe ID langsung pada formulir backup di atas.
           </p>
         </div>
       ) : (
@@ -573,145 +544,6 @@ export default function BackupServer() {
             <p className="text-xs text-slate-400 max-w-md mt-1.5 leading-relaxed">
               Ketik ID Komunitas Roblox di atas untuk melihat daftar seluruh experience dan universe place yang aktif untuk persiapan DataStore backup.
             </p>
-          </div>
-        </div>
-      )}
-
-      {/* --- DataStore Inspector Modal --- */}
-      {inspectExp && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-2xl glass-panel bg-slate-950/90 border border-white/[0.12] rounded-3xl shadow-2xl shadow-cyan-950/40 overflow-hidden flex flex-col max-h-[85vh] backdrop-blur-2xl">
-            {/* Modal Header */}
-            <div className="p-6 border-b border-white/[0.08] flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 shadow-md">
-                  <Database size={22} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    {inspectExp.name}
-                  </h3>
-                  <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-                    <span>Universe ID:</span>
-                    <strong className="text-cyan-300 font-mono">{inspectExp.id}</strong>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => setInspectExp(null)}
-                className="w-9 h-9 rounded-xl glass-panel-elevated border-white/[0.08] text-slate-400 hover:text-white flex items-center justify-center text-sm font-bold cursor-pointer transition-all hover:bg-white/[0.05]"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1">
-              {/* API Key field if user wants to change/provide */}
-              <div className="glass-panel-elevated bg-white/[0.02] border border-white/[0.08] rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-200 flex items-center gap-2">
-                    <Key size={14} className="text-cyan-400" />
-                    Open Cloud API Key
-                  </label>
-                  <span className="text-[11px] text-slate-400">Izin: DataStores (Read/Write)</span>
-                </div>
-                <div className="flex items-center gap-2.5">
-                  <input
-                    type="password"
-                    placeholder="Masukkan Roblox Open Cloud API Key..."
-                    value={inspectApiKey}
-                    onChange={(e) => setInspectApiKey(e.target.value)}
-                    className="flex-1 bg-slate-950/70 border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500/50 font-mono"
-                  />
-                  <Button
-                    onClick={() => handleInspect(inspectExp)}
-                    disabled={inspectLoading}
-                    className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl shrink-0 cursor-pointer shadow-md shadow-cyan-500/20"
-                  >
-                    {inspectLoading ? <RefreshCw size={14} className="animate-spin" /> : 'Connect'}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Status / Error */}
-              {inspectError && (
-                <div className="bg-red-500/10 border border-red-500/25 rounded-xl p-3.5 text-red-400 text-xs flex items-center gap-2.5">
-                  <AlertCircle size={16} className="shrink-0 text-red-400" />
-                  <span>{inspectError}</span>
-                </div>
-              )}
-
-              {/* DataStores List */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wider text-[11px] flex items-center gap-2">
-                    <HardDriveDownload size={14} className="text-cyan-400" />
-                    Standard DataStores Terdaftar ({datastoresList.length})
-                  </h4>
-                </div>
-
-                {inspectLoading ? (
-                  <div className="py-8 flex flex-col items-center justify-center gap-2 text-slate-400">
-                    <RefreshCw size={24} className="text-cyan-400 animate-spin" />
-                    <span className="text-xs">Menghubungi Roblox Open Cloud API...</span>
-                  </div>
-                ) : datastoresList.length > 0 ? (
-                  <div className="space-y-2.5">
-                    {datastoresList.map((ds: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="glass-panel-elevated bg-white/[0.02] border border-white/[0.06] rounded-xl p-3.5 flex items-center justify-between gap-3 hover:border-white/20 transition-all"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 text-xs font-mono font-bold">
-                            DS
-                          </div>
-                          <div>
-                            <div className="text-sm font-bold text-white">{ds.name}</div>
-                            {ds.createdTime && (
-                              <div className="text-[10px] text-slate-400">
-                                Created: {new Date(ds.createdTime).toLocaleString()}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-300 bg-emerald-500/10">
-                            Online
-                          </Badge>
-                          <Button
-                            size="sm"
-                            className="bg-white/[0.06] hover:bg-white/[0.1] text-white text-xs rounded-lg px-3 py-1 font-semibold cursor-pointer transition-all border border-white/[0.08]"
-                            onClick={() => alert(`Fitur Snapshot untuk DataStore "${ds.name}" siap diproses pada tahapan migrasi berikutnya!`)}
-                          >
-                            Prepare Snapshot
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : !inspectLoading && !inspectError ? (
-                  <div className="py-6 text-center text-xs text-slate-400 glass-panel bg-white/[0.02] rounded-xl border border-white/[0.06]">
-                    Klik tombol "Connect" dengan API Key yang valid untuk memuat daftar DataStore di Universe ini.
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 bg-slate-950/60 border-t border-white/[0.08] flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">
-                Roblox Open Cloud v1 Engine
-              </span>
-              <Button
-                onClick={() => setInspectExp(null)}
-                className="glass-panel-elevated border-white/[0.08] hover:bg-white/[0.08] text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer"
-              >
-                Tutup
-              </Button>
-            </div>
           </div>
         </div>
       )}

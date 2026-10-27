@@ -8,3 +8,6 @@ dist/
 build/
 .DS_Store
 .vercel
+
+# Private backup payloads and job checkpoints
+.backup-data/

@@ -33,3 +33,7 @@ The backend is a standard Node.js server. For production, you can run `npm run b
 
 ---
 Built with ❤️ by Antigravity for Disperser.
+
+## Backup Server
+
+Backup, migration, restore, persistent storage setup, API permissions, and test commands are documented in [backend/BACKUP.md](backend/BACKUP.md).
