@@ -288,6 +288,5 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick }) => {
     </div>
   );
 };
-};
 
 export default LandingPage;
