@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check, Database, Download, FileUp, LoaderCircle, Pause, Play, Plus, RefreshCw, ShieldCheck, Trash2, X } from 'lucide-react';
-import { backupApi } from '@/api/backup';
+import { backupApi, BackupApiError } from '@/api/backup';
 import type { BackupHandle, BackupJobView, BackupStore, CreateBackup } from '@/api/backup';
 
 type Experience = { id: number; name: string };
@@ -51,12 +51,14 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
   const [error, setError] = useState('');
   const [tested, setTested] = useState('');
   const [jobErrors, setJobErrors] = useState<Record<string, string>>({});
+  const [missingIds, setMissingIds] = useState<string[]>([]);
   const handlesRef = useRef(handles);
+  const missingJobs = useRef(new Set<string>());
   const generation = useRef(0);
   const uploadInput = useRef<HTMLInputElement>(null);
   const selectedStores = choices.filter(s => s.selected).map(({ kind, name, scope }) => ({ kind, name, scope }));
   const signature = JSON.stringify([sourceUniverse, sourceKey, selectedStores]);
-  const completed = handles.filter(h => h.job.captureComplete);
+  const completed = handles.filter(h => h.job.captureComplete && !missingIds.includes(h.id));
   const restoreSource = completed.find(h => h.id === (restoreId || completed[0]?.id));
   const selected = handles.find(h => h.id === selectedId) || handles[0];
   const experienceName = (id?: string, saved?: string) => saved || experiences.find(e => String(e.id) === id)?.name || (id ? 'Universe ' + id : 'Experience tidak diketahui');
@@ -81,18 +83,22 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
   }
 
   const updateJob = (job: BackupJobView) => setHandles(current => current.map(h => h.id === job.id ? { ...h, job } : h));
+  function forget(handle: BackupHandle) {
+    const remaining = handlesRef.current.filter(item => item.id !== handle.id);
+    handlesRef.current = remaining;
+    missingJobs.current.delete(handle.id);
+    setMissingIds(current => current.filter(id => id !== handle.id));
+    setHandles(remaining);
+    setSelectedId(current => current === handle.id ? remaining[0]?.id || '' : current);
+    setRestoreId(current => current === handle.id ? '' : current);
+    setJobErrors(current => { const next = { ...current }; delete next[handle.id]; return next; });
+    try { localStorage.setItem(storageKey, JSON.stringify(remaining)); }
+    catch { setError('Riwayat lokal gagal disimpan. Coba lagi setelah penyimpanan browser tersedia.'); }
+  }
   async function deleteSelected(handle: BackupHandle) {
     const name = experienceName(handle.job.sourceUniverseId, handle.sourceName);
     if (!window.confirm(`Hapus ${modeLabels[handle.job.mode]} untuk ${name}? Data backup dan checkpoint di server akan dihapus permanen.`)) return;
-    await perform('delete', async () => {
-      await backupApi.delete(handle);
-      const remaining = handlesRef.current.filter(item => item.id !== handle.id);
-      handlesRef.current = remaining;
-      setHandles(remaining);
-      setSelectedId(current => current === handle.id ? remaining[0]?.id || '' : current);
-      setRestoreId(current => current === handle.id ? '' : current);
-      localStorage.setItem(storageKey, JSON.stringify(remaining));
-    });
+    await perform('delete', async () => { await backupApi.delete(handle); forget(handle); });
   }
   useEffect(() => {
     let stopped = false;
@@ -101,15 +107,20 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
       if (refreshing) return;
       refreshing = true;
       try {
-        await Promise.all(handlesRef.current.filter(h => all || ['running', 'queued'].includes(h.job.status)).map(async handle => {
+        await Promise.all(handlesRef.current.filter(h => !missingJobs.current.has(h.id) && (all || ['running', 'queued'].includes(h.job.status))).map(async handle => {
           try {
             const result = await backupApi.status(handle);
             if (!stopped) {
+              missingJobs.current.delete(handle.id);
+              setMissingIds(current => current.filter(id => id !== handle.id));
               setHandles(current => current.map(h => h.id === handle.id ? { ...h, job: result.job } : h));
               setJobErrors(current => { const next = { ...current }; delete next[handle.id]; return next; });
             }
           } catch (err) {
-            if (!stopped) setJobErrors(current => ({ ...current, [handle.id]: err instanceof Error ? err.message : 'Status belum dapat diperbarui.' }));
+            if (!stopped) {
+              if (err instanceof BackupApiError && err.status === 404) { missingJobs.current.add(handle.id); setMissingIds(current => current.includes(handle.id) ? current : [...current, handle.id]); }
+              setJobErrors(current => ({ ...current, [handle.id]: err instanceof BackupApiError && err.status === 404 ? 'Proses ini tidak ditemukan di server. File backup/checkpoint mungkin hilang saat deploy lama. Hapus riwayat lokal ini dan buat backup baru setelah Volume Railway aktif.' : err instanceof Error ? err.message : 'Status belum dapat diperbarui.' }));
+            }
           }
         }));
       } finally { refreshing = false; }
@@ -368,11 +379,13 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
                 {job.mode !== 'backup' && <input className={field} aria-label="API key tujuan untuk melanjutkan" type="password" autoComplete="off" placeholder="API key tujuan" value={targetKey} onChange={e => setTargetKey(e.target.value)} />}
               </div>}
               <div className="flex flex-wrap gap-2">
+                {missingIds.includes(job.id) ? <button className={button + ' border-amber-400/30 text-amber-200'} onClick={() => forget(selected)}><Trash2 size={14} /> Hapus riwayat lokal</button> : <>
                 {['running', 'queued'].includes(job.status) && <button className={button} disabled={!!busy || job.pauseRequested} onClick={() => { void perform('pause', async () => updateJob((await backupApi.pause(selected)).job)); }}><Pause size={14} /> {job.pauseRequested ? 'Menyelesaikan request aktif…' : 'Jeda'}</button>}
                 {['paused', 'failed'].includes(job.status) && <button className={primary} disabled={!!busy || (!job.captureComplete && !sourceKey) || (job.mode !== 'backup' && !targetKey)} onClick={() => { void perform('resume', async () => updateJob((await backupApi.resume(selected, { sourceKey: sourceKey.trim(), targetKey: targetKey.trim() })).job)); }}><Play size={14} /> Lanjutkan checkpoint</button>}
                 {job.captureComplete && <button className={button} disabled={!!busy} onClick={() => { void perform('download', () => backupApi.download(selected)); }}><Download size={14} /> {busy === 'download' ? 'Mengunduh…' : 'Unduh backup'}</button>}
                 {job.captureComplete && <button className={button} onClick={() => { setMode('restore'); setRestoreId(selected.id); }}><ArrowRight size={14} /> Gunakan untuk restore</button>}
                 <button className={button + ' hover:border-red-400/40 hover:text-red-300'} disabled={!!busy || ['running', 'queued'].includes(job.status)} onClick={() => { void deleteSelected(selected); }} title={['running', 'queued'].includes(job.status) ? 'Jeda proses terlebih dahulu' : 'Hapus backup dan checkpoint dari server'}><Trash2 size={14} /> Hapus</button>
+                </>}
               </div>
               {job.status === 'completed' && job.skipped > 0 && <p className="text-[11px] leading-relaxed text-amber-200">{job.skipped} key tujuan dipertahankan sesuai pilihan “Lewati”. Selesai tidak berarti data kedua experience identik.</p>}
             </div>}
