@@ -240,7 +240,7 @@ export default function Settings() {
                   onChange={(e) => setApiKey(e.target.value)}
                   className="bg-slate-950/60 border-white/[0.08] text-white text-sm font-mono rounded-xl placeholder:text-slate-600 focus-visible:ring-cyan-500/40 h-11"
                 />
-                <p className="text-xs text-slate-400">Required permissions: Assets API (Read & Write).</p>
+                <p className="text-xs text-slate-400">Upload: Assets API (Read & Write). Sharing Asset: tambah scope <span className="font-mono text-cyan-300">asset-permissions:write</span>.</p>
               </div>
 
               {status !== 'idle' && (
@@ -289,6 +289,10 @@ export default function Settings() {
                   </li>
                   <li className="flex items-start gap-2.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
+                    <span><strong className="text-slate-200">asset-permissions:write</strong> — Required for Sharing Asset between communities and experiences.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
                     <span><strong className="text-slate-200">DataStore API</strong> (Read & Write) — Optional, used if accessing DataStore snapshots on Backup Server.</span>
                   </li>
                 </ul>
@@ -321,6 +325,7 @@ export default function Settings() {
                   In <span className="text-white font-semibold">API Permissions</span>, add:
                   <ul className="list-disc list-inside ml-4 mt-1.5 text-xs text-slate-400 space-y-1">
                     <li>Assets API (Read & Write)</li>
+                    <li>Asset Permissions (Write) untuk Sharing Asset</li>
                     <li>Ordered DataStore (Optional)</li>
                   </ul>
                 </li>

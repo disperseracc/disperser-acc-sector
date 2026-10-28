@@ -16,6 +16,7 @@ import ws from 'ws';
 global.WebSocket = ws;
 import { initBot, getBotClient } from './bot';
 import { createBackupRouter } from './backup/router';
+import { createAssetSharingRouter } from './assetSharing';
 
 // Trys multiple prospective paths for the .env file to be robust against execution directory
 const envPaths = [
@@ -393,6 +394,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-api-key']
 }));
 app.use(express.json());
+app.use('/api/asset-sharing', createAssetSharingRouter());
 app.use('/api/backup', createBackupRouter());
 app.use(express.urlencoded({ extended: true }));
 
