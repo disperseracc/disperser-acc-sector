@@ -195,8 +195,8 @@ export class BackupEngine {
       let response: any;
       try { response = await this.cloud.write(job.targetUniverseId!, credentials.targetKey!, entry, job.conflict === 'overwrite', check, retry); }
       catch (error) {
-        if (job.conflict === 'skip' && error instanceof CloudError && error.status === 409) {
-          // A retry after an uncertain create can also return 409. Compare first.
+        if (job.conflict === 'skip' && error instanceof CloudError && (error.status === 409 || (error.status === 400 && /^Roblox 400: Entry Already Exist\b/i.test(error.message)))) {
+          // Roblox can report an existing key as 409 or 400 Entry Already Exist. Compare before skipping.
           const current = await this.cloud.read(job.targetUniverseId!, credentials.targetKey!, entry, entry.key, check, retry);
           outcome = equivalent(entry, current) ? 'unchanged' : 'skipped';
         } else throw error;

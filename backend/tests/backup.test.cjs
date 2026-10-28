@@ -35,7 +35,7 @@ async function fixture(t, count = 3, delay = 0) {
   const calls = [];
   let active = 0;
   let maxActive = 0;
-  const control = { rejectSource: false, throttleOnce: false, networkAfterCreate: false, mismatchReadback: false };
+  const control = { rejectSource: false, throttleOnce: false, networkAfterCreate: false, mismatchReadback: false, existingAs400: false };
   for (let i = 0; i < count; i++) data.set(key('1', 'standard', standard.name, i % 2 ? 'custom/scope' : 'global', 'user/' + i), { value: { coins: i, enabled: false }, users: ['users/123'], attributes: { version: 1 }, revisionId: 'r' + i });
   data.set(key('1', 'ordered', ordered.name, ordered.scope, 'user/0'), { value: 0 });
   data.set(key('1', 'ordered', ordered.name, ordered.scope, 'user/1'), { value: 99 });
@@ -74,7 +74,7 @@ async function fixture(t, count = 3, delay = 0) {
         if (control.mismatchReadback && u === '2') return reply({ value: 999 });
         return reply(current);
       }
-      if (init.method === 'POST' && data.has(identity)) return reply({ message: 'already exists' }, 409);
+      if (init.method === 'POST' && data.has(identity)) return control.existingAs400 ? reply({ message: 'Entry Already Exist' }, 400) : reply({ message: 'already exists' }, 409);
       if (init.method === 'PATCH') assert.equal(url.searchParams.get('allowMissing'), 'true');
       const body = JSON.parse(init.body);
       data.set(identity, body);
@@ -120,6 +120,16 @@ test('skip preserves conflicting destination data; overwrite skips identical rec
   assert.equal(f.data.get(destination).value.coins, 0);
 });
 
+test('Roblox 400 Entry Already Exist respects skip mode and keeps destination data', async t => {
+  const f = await fixture(t, 1);
+  f.control.existingAs400 = true;
+  const destination = key('2', 'standard', standard.name, 'global', 'user/0');
+  f.data.set(destination, { value: { coins: 800 }, users: [], attributes: {} });
+  const handle = await f.engine.create(input());
+  const job = await terminal(f.engine, handle, 'completed');
+  assert.equal(job.skipped, 1);
+  assert.equal(f.data.get(destination).value.coins, 800);
+});
 test('pause, reload and resume use checkpoints without rewriting completed keys', async t => {
   const f = await fixture(t, 22, 4);
   const handle = await f.engine.create(input());
