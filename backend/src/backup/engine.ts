@@ -29,6 +29,15 @@ async function bounded<T>(items: T[], count: number, action: (item: T) => Promis
   }));
   if (failed) throw failure;
 }
+function firstNullPath(value: unknown, location: string, depth = 0): string | undefined {
+  if (value === null) return location;
+  if (!value || typeof value !== 'object' || depth > 24) return undefined;
+  for (const [key, item] of Object.entries(value)) {
+    const found = firstNullPath(item, Array.isArray(value) ? `${location}[${key}]` : `${location}.${key}`, depth + 1);
+    if (found) return found;
+  }
+  return undefined;
+}
 function equivalent(entry: BackupEntry, remote: any) {
   return Object.prototype.hasOwnProperty.call(remote, 'value') && isDeepStrictEqual(entry.value, remote.value) &&
     (entry.kind === 'ordered' || (isDeepStrictEqual([...(entry.users || [])].sort(), [...(remote.users || [])].sort()) && isDeepStrictEqual(entry.attributes || {}, remote.attributes || {})));
@@ -225,6 +234,9 @@ export class BackupEngine {
           // Roblox can report an existing key as 409 or 400 Entry Already Exist. Compare before skipping.
           const current = await this.cloud.read(job.targetUniverseId!, credentials.targetKey!, entry, entry.key, check, retry);
           outcome = equivalent(entry, current) ? 'unchanged' : 'skipped';
+        } else if (error instanceof CloudError && error.status === 400 && /Value cannot be null\. \(Parameter 'item'\)/i.test(error.message)) {
+          const nullPath = firstNullPath(entry.value, 'value') || firstNullPath(entry.attributes, 'attributes');
+          throw new BackupError(`Roblox menolak entry ${entry.name}/${entry.scope}/${entry.key}: ${error.message}${nullPath ? `; lokasi null: ${nullPath.slice(0, 120)}` : '; tidak ada null pada payload yang terlihat'}. Data tidak diubah.`, 400);
         } else throw error;
       }
       if (outcome === 'written') {
