@@ -43,6 +43,7 @@ export function createBackupRouter(engine = new BackupEngine()) {
   }));
   router.post('/jobs', wrap(async (req, res) => { res.status(202).json(await engine.create(req.body)); }));
   router.get('/jobs/:id', wrap(async (req, res) => { res.json({ job: await engine.status(String(req.params.id), token(req)) }); }));
+  router.delete('/jobs/:id', wrap(async (req, res) => { await engine.delete(String(req.params.id), token(req)); res.json({ deleted: true }); }));
   router.post('/jobs/:id/pause', wrap(async (req, res) => { res.json({ job: await engine.pause(String(req.params.id), token(req)) }); }));
   router.post('/jobs/:id/resume', wrap(async (req, res) => { res.status(202).json({ job: await engine.resume(String(req.params.id), token(req), req.body) }); }));
   router.get('/jobs/:id/download', wrap(async (req, res) => {

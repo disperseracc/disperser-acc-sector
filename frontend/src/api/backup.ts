@@ -45,6 +45,7 @@ export const backupApi = {
   create: (body: CreateBackup) => request('/jobs', json(body)) as Promise<{ job: BackupJobView; token: string }>,
   status: (handle: BackupHandle) => request('/jobs/' + handle.id, { headers: auth(handle.token) }) as Promise<{ job: BackupJobView }>,
   pause: (handle: BackupHandle) => request('/jobs/' + handle.id + '/pause', json({}, handle.token)) as Promise<{ job: BackupJobView }>,
+  delete: (handle: BackupHandle) => request('/jobs/' + handle.id, { method: 'DELETE', headers: auth(handle.token) }) as Promise<{ deleted: true }>,
   resume: (handle: BackupHandle, keys: BackupCredentials) => request('/jobs/' + handle.id + '/resume', json(keys, handle.token)) as Promise<{ job: BackupJobView }>,
   importFile: async (file: File): Promise<{ job: BackupJobView; token: string }> => {
     const body = new FormData(); body.append('backup', file);

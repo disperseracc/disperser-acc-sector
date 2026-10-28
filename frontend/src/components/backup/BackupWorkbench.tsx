@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Check, Database, Download, FileUp, LoaderCircle, Pause, Play, Plus, RefreshCw, ShieldCheck, X } from 'lucide-react';
+import { ArrowRight, Check, Database, Download, FileUp, LoaderCircle, Pause, Play, Plus, RefreshCw, ShieldCheck, Trash2, X } from 'lucide-react';
 import { backupApi } from '@/api/backup';
 import type { BackupHandle, BackupJobView, BackupStore, CreateBackup } from '@/api/backup';
 
@@ -81,6 +81,19 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
   }
 
   const updateJob = (job: BackupJobView) => setHandles(current => current.map(h => h.id === job.id ? { ...h, job } : h));
+  async function deleteSelected(handle: BackupHandle) {
+    const name = experienceName(handle.job.sourceUniverseId, handle.sourceName);
+    if (!window.confirm(`Hapus ${modeLabels[handle.job.mode]} untuk ${name}? Data backup dan checkpoint di server akan dihapus permanen.`)) return;
+    await perform('delete', async () => {
+      await backupApi.delete(handle);
+      const remaining = handlesRef.current.filter(item => item.id !== handle.id);
+      handlesRef.current = remaining;
+      setHandles(remaining);
+      setSelectedId(current => current === handle.id ? remaining[0]?.id || '' : current);
+      setRestoreId(current => current === handle.id ? '' : current);
+      localStorage.setItem(storageKey, JSON.stringify(remaining));
+    });
+  }
   useEffect(() => {
     let stopped = false;
     let refreshing = false;
@@ -359,6 +372,7 @@ export default function BackupWorkbench({ experiences, suggestion, initialKey }:
                 {['paused', 'failed'].includes(job.status) && <button className={primary} disabled={!!busy || (!job.captureComplete && !sourceKey) || (job.mode !== 'backup' && !targetKey)} onClick={() => { void perform('resume', async () => updateJob((await backupApi.resume(selected, { sourceKey: sourceKey.trim(), targetKey: targetKey.trim() })).job)); }}><Play size={14} /> Lanjutkan checkpoint</button>}
                 {job.captureComplete && <button className={button} disabled={!!busy} onClick={() => { void perform('download', () => backupApi.download(selected)); }}><Download size={14} /> {busy === 'download' ? 'Mengunduh…' : 'Unduh backup'}</button>}
                 {job.captureComplete && <button className={button} onClick={() => { setMode('restore'); setRestoreId(selected.id); }}><ArrowRight size={14} /> Gunakan untuk restore</button>}
+                <button className={button + ' hover:border-red-400/40 hover:text-red-300'} disabled={!!busy || ['running', 'queued'].includes(job.status)} onClick={() => { void deleteSelected(selected); }} title={['running', 'queued'].includes(job.status) ? 'Jeda proses terlebih dahulu' : 'Hapus backup dan checkpoint dari server'}><Trash2 size={14} /> Hapus</button>
               </div>
               {job.status === 'completed' && job.skipped > 0 && <p className="text-[11px] leading-relaxed text-amber-200">{job.skipped} key tujuan dipertahankan sesuai pilihan “Lewati”. Selesai tidak berarti data kedua experience identik.</p>}
             </div>}

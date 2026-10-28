@@ -130,6 +130,21 @@ test('Roblox 400 Entry Already Exist respects skip mode and keeps destination da
   assert.equal(job.skipped, 1);
   assert.equal(f.data.get(destination).value.coins, 800);
 });
+test('delete requires capability, waits for active work, and protects shared backup payloads', async t => {
+  const f = await fixture(t, 2);
+  const source = await f.engine.create({ ...input(), mode: 'backup' });
+  await assert.rejects(() => f.engine.delete(source.job.id, source.token), /Jeda proses/);
+  await terminal(f.engine, source, 'completed');
+  const restored = await f.engine.create({ mode: 'restore', backupJobId: source.job.id, backupToken: source.token, targetUniverseId: '2', confirmedTarget: '2', targetKey: 'TARGET_SECRET' });
+  await terminal(f.engine, restored, 'completed');
+  await assert.rejects(() => f.engine.delete(source.job.id, '0'.repeat(64)), /token akses/);
+  await assert.rejects(() => f.engine.delete(source.job.id, source.token), /masih dipakai proses restore/);
+  await f.engine.delete(restored.job.id, restored.token);
+  await assert.rejects(() => f.engine.status(restored.job.id, restored.token), /tidak ditemukan/);
+  assert.ok(await fs.stat(path.join(f.root, source.job.id, 'job.json')));
+  await f.engine.delete(source.job.id, source.token);
+  await assert.rejects(() => fs.stat(path.join(f.root, source.job.id)), { code: 'ENOENT' });
+});
 test('pause, reload and resume use checkpoints without rewriting completed keys', async t => {
   const f = await fixture(t, 22, 4);
   const handle = await f.engine.create(input());
@@ -278,6 +293,12 @@ test('HTTP endpoints create, protect, export and import a real streamed backup',
   assert.equal(imported.job.captured, 4);
   const protectedResponse = await fetch(base + '/jobs/' + imported.job.id, { headers: { Authorization: 'Bearer ' + imported.token } });
   assert.equal(protectedResponse.headers.get('cache-control'), 'no-store');
+  const deniedDelete = await fetch(base + '/jobs/' + imported.job.id, { method: 'DELETE' });
+  assert.equal(deniedDelete.status, 404);
+  const deleted = await fetch(base + '/jobs/' + imported.job.id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + imported.token } });
+  assert.equal(deleted.status, 200);
+  assert.deepEqual(await deleted.json(), { deleted: true });
+  assert.equal((await fetch(base + '/jobs/' + imported.job.id, { headers: { Authorization: 'Bearer ' + imported.token } })).status, 404);
 });
 
 test('one shared rate limiter spaces same-universe requests across concurrent clients', async () => {

@@ -9,7 +9,7 @@ The Backup Server page now supports manual backups, cross-universe migration, an
 - Mount persistent storage and set BACKUP_DATA_DIR to that mount, for example /data/disperser-backups. Without it, the default is backend/.backup-data; ephemeral redeployments can lose backups/checkpoints.
 - Run one backend process/replica for the backup directory. Universe reservations and request budgets are coordinated in that process; this implementation does not provide distributed locking across replicas.
 - Keep the backup directory private and outside any static/public web directory.
-- Backups are retained on disk. Monitor disk capacity and export archives for independent storage; there is no automatic retention deletion.
+- Backups are retained on disk until manually deleted. Monitor disk capacity and export archives for independent storage; there is no automatic retention deletion.
 - The new implementation does not add dependencies or require a database migration.
 
 ## API permissions
@@ -45,6 +45,7 @@ References:
 5. For migration/restore, choose the destination key, conflict policy, and type the destination Universe ID to confirm writing.
 6. Download a completed capture as a compressed .jsonl.gz archive. Restore accepts an existing complete backup or an uploaded Disperser archive.
 7. Pause drains in-flight work and preserves checkpoints. After a backend restart, interrupted work becomes paused; enter API keys again to resume.
+8. Use Hapus to permanently remove a completed, paused, or failed job from browser history and backend storage. Active jobs must be paused first. A source backup used by restore jobs cannot be deleted until those restore jobs are deleted.
 
 ## Correctness and performance
 

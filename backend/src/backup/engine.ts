@@ -41,6 +41,8 @@ export class BackupEngine {
   private saves = new Map<string, Promise<void>>();
   private active = new Map<string, { stop: boolean; startedAt: number; universes: string[] }>();
   private reservations = new Map<string, string[]>();
+  private deleting = new Set<string>();
+  private sourcesInCreation = new Map<string, number>();
   constructor(readonly root = process.env.BACKUP_DATA_DIR || path.resolve(__dirname, '../../.backup-data'), cloud = new RobloxCloud(), private concurrency = 6) {
     this.cloud = cloud;
   }
@@ -133,6 +135,7 @@ export class BackupEngine {
     if (input.mode === 'restore') {
       source = await this.authorize(String(input.backupJobId || ''), String(input.backupToken || ''));
       if (!source.captureComplete) throw new BackupError('Backup sumber belum lengkap.');
+      if (this.deleting.has(source.id) || this.deleting.has(source.dataJobId)) throw new BackupError('Backup sumber sedang dihapus. Coba lagi.', 409);
     }
     const sourceId = source?.sourceUniverseId || universeId(input.sourceUniverseId);
     if (!source) storeSpecs(input.stores);
@@ -145,12 +148,35 @@ export class BackupEngine {
     if (!source && !input.sourceKey?.trim()) throw new BackupError('API key sumber belum diisi.');
     this.assertCapacity({ id: '', sourceUniverseId: sourceId, targetUniverseId: input.mode === 'backup' ? undefined : universeId(input.targetUniverseId), captureComplete: !!source });
     const reservation = crypto.randomUUID();
+    if (source) this.sourcesInCreation.set(source.dataJobId, (this.sourcesInCreation.get(source.dataJobId) || 0) + 1);
     this.reservations.set(reservation, [!source ? sourceId : '', input.mode === 'backup' ? '' : universeId(input.targetUniverseId)].filter(Boolean));
     try {
       const result = await this.newJob(input, source);
       this.launch(result.job, input);
       return { job: this.public(result.job), token: result.token };
-    } finally { this.reservations.delete(reservation); }
+    } finally { this.reservations.delete(reservation); if (source) { const count = this.sourcesInCreation.get(source.dataJobId) || 0; if (count <= 1) this.sourcesInCreation.delete(source.dataJobId); else this.sourcesInCreation.set(source.dataJobId, count - 1); } }
+  }
+  async delete(id: string, token: string) {
+    const job = await this.authorize(id, token);
+    if (this.active.has(id) || ['queued', 'running'].includes(job.status)) throw new BackupError('Jeda proses dan tunggu hingga status Dijeda sebelum menghapus.', 409);
+    if (this.deleting.has(id) || this.sourcesInCreation.has(job.dataJobId)) throw new BackupError('Backup ini sedang digunakan. Coba lagi sesaat.', 409);
+    this.deleting.add(id);
+    try {
+      if (job.dataJobId === id) {
+        const folders = await fs.readdir(this.root, { withFileTypes: true });
+        for (const folder of folders) {
+          if (!folder.isDirectory() || folder.name === id || !/^[a-f0-9-]{36}$/.test(folder.name)) continue;
+          let dependent: BackupJob;
+          try { dependent = JSON.parse(await fs.readFile(path.join(this.dir(folder.name), 'job.json'), 'utf8')); }
+          catch (error: any) { if (error.code === 'ENOENT') continue; throw error; }
+          if (dependent.dataJobId === id) throw new BackupError('Backup ini masih dipakai proses restore lain. Hapus proses restore terkait lebih dulu.', 409);
+        }
+      }
+      const directory = path.resolve(this.dir(id));
+      if (path.dirname(directory) !== path.resolve(this.root)) throw new BackupError('Direktori backup tidak valid.');
+      await fs.rm(directory, { recursive: true });
+      this.jobs.delete(id); this.loads.delete(id); this.saves.delete(id);
+    } finally { this.deleting.delete(id); }
   }
   async status(id: string, token: string) { return this.public(await this.authorize(id, token)); }
   async pause(id: string, token: string) {
