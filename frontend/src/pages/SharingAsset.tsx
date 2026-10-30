@@ -3,6 +3,7 @@ import { ArrowRight, CheckCircle2, Loader2, Music2, Share2, XCircle } from 'luci
 import { api, BASE_URL } from '../api/api';
 
 type LibraryAudio = { id: string; name: string; assetId: string };
+type SourceType = 'Group' | 'User';
 type GrantResult = {
   targetType: 'Group' | 'Universe';
   targetId: string;
@@ -14,7 +15,14 @@ type GrantResult = {
 const validId = (value: string) => /^[1-9]\d*$/.test(value.trim());
 
 export default function SharingAsset() {
+  const [sourceType, setSourceType] = useState<SourceType>(() => {
+    const preferred = localStorage.getItem('disperser_upload_target');
+    if (preferred === 'user') return 'User';
+    if (preferred === 'group') return 'Group';
+    return localStorage.getItem('disperser_group_id') ? 'Group' : 'User';
+  });
   const [sourceGroupId, setSourceGroupId] = useState(localStorage.getItem('disperser_group_id') || '');
+  const [sourceUserId, setSourceUserId] = useState(localStorage.getItem('disperser_user_id') || '');
   const [targetGroupId, setTargetGroupId] = useState('');
   const [targetUniverseId, setTargetUniverseId] = useState('');
   const [pastedIds, setPastedIds] = useState('');
@@ -39,6 +47,7 @@ export default function SharingAsset() {
     ...(pastedIds.match(/\d+/g) || []),
     ...selected,
   ])], [pastedIds, selected]);
+  const sourceId = sourceType === 'Group' ? sourceGroupId : sourceUserId;
 
   const toggle = (id: string) => setSelected(previous => previous.includes(id)
     ? previous.filter(item => item !== id) : [...previous, id]);
@@ -47,7 +56,7 @@ export default function SharingAsset() {
     const response = await fetch(`${BASE_URL.replace(/\/+$/, '')}/api/asset-sharing/grant`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey, sourceGroupId: sourceGroupId.trim(), targetType, targetId, assetIds }),
+      body: JSON.stringify({ apiKey, sourceType, sourceId: sourceId.trim(), targetType, targetId, assetIds }),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || `Gagal memberi akses (${response.status}).`);
@@ -57,8 +66,10 @@ export default function SharingAsset() {
   async function handleShare() {
     const apiKey = localStorage.getItem('disperser_key')?.trim() || '';
     if (!apiKey) return setError('Simpan Roblox Open Cloud API key di Settings dulu.');
-    if (!validId(sourceGroupId) || !validId(targetGroupId)) return setError('Isi Group ID Community A dan B yang valid.');
-    if (sourceGroupId.trim() === targetGroupId.trim()) return setError('Community A dan B harus berbeda.');
+    if (!validId(sourceId)) return setError(`Isi ${sourceType === 'Group' ? 'Group ID' : 'User ID'} pemilik audio yang valid.`);
+    if (!targetGroupId.trim() && !targetUniverseId.trim()) return setError('Isi Group ID tujuan atau Universe ID experience tujuan.');
+    if (targetGroupId.trim() && !validId(targetGroupId)) return setError('Group ID Community B harus berupa angka positif.');
+    if (sourceType === 'Group' && targetGroupId.trim() && sourceId.trim() === targetGroupId.trim()) return setError('Community asal dan tujuan harus berbeda.');
     if (targetUniverseId.trim() && !validId(targetUniverseId)) return setError('Universe ID tujuan harus berupa angka positif.');
     if (assetIds.length < 1 || assetIds.length > 100) return setError('Pilih 1–100 audio per proses.');
 
@@ -67,9 +78,11 @@ export default function SharingAsset() {
     setSharing(true);
     try {
       const next: GrantResult[] = [];
-      const groupResult = await grant('Group', targetGroupId.trim(), apiKey);
-      next.push(groupResult);
-      setResults([...next]);
+      if (targetGroupId.trim()) {
+        const groupResult = await grant('Group', targetGroupId.trim(), apiKey);
+        next.push(groupResult);
+        setResults([...next]);
+      }
       if (targetUniverseId.trim()) {
         // The universe needs its own grant to play restricted audio at runtime.
         const universeResult = await grant('Universe', targetUniverseId.trim(), apiKey);
@@ -91,27 +104,35 @@ export default function SharingAsset() {
       <div>
         <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-cyan-400"><Share2 size={15} /> Development Items</div>
         <h1 className="text-3xl font-black text-white">Sharing Asset</h1>
-        <p className="mt-2 max-w-2xl text-sm text-slate-400">Bagikan izin pakai audio Community A ke Community B tanpa upload ulang. Audio tetap dimiliki Community A.</p>
+        <p className="mt-2 max-w-2xl text-sm text-slate-400">Bagikan izin pakai audio dari Community atau akun personal ke Community dan experience tujuan tanpa upload ulang. Audio tetap dimiliki pemilik asal.</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className={card}>
-          <div className="mb-4 flex items-center gap-2 text-white"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500/20 text-sm font-bold text-cyan-300">1</span><h2 className="font-bold">Pilih audio dari Community A</h2></div>
-          <label className="mb-1 block text-xs font-semibold text-slate-300">Group ID Community A</label>
-          <input className={field} inputMode="numeric" value={sourceGroupId} onChange={event => setSourceGroupId(event.target.value)} placeholder="Contoh: 1234567" />
+          <div className="mb-4 flex items-center gap-2 text-white"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500/20 text-sm font-bold text-cyan-300">1</span><h2 className="font-bold">Pilih audio dari pemilik asal</h2></div>
+          <div className="mb-4 flex gap-2" role="group" aria-label="Jenis pemilik audio asal">
+            {(['Group', 'User'] as const).map(type => (
+              <button key={type} type="button" aria-pressed={sourceType === type} onClick={() => setSourceType(type)}
+                className={`rounded-lg border px-4 py-2 text-xs font-bold transition ${sourceType === type ? 'border-cyan-400 bg-cyan-500/20 text-cyan-200' : 'border-white/10 bg-slate-950/50 text-slate-400 hover:text-white'}`}>
+                {type === 'Group' ? 'Community' : 'Personal'}
+              </button>
+            ))}
+          </div>
+          <label className="mb-1 block text-xs font-semibold text-slate-300">{sourceType === 'Group' ? 'Group ID Community asal' : 'User ID pemilik audio'}</label>
+          <input className={field} inputMode="numeric" value={sourceId} onChange={event => sourceType === 'Group' ? setSourceGroupId(event.target.value) : setSourceUserId(event.target.value)} placeholder={sourceType === 'Group' ? 'Contoh: 1234567' : 'User ID akun Roblox'} />
           <label className="mb-1 mt-4 block text-xs font-semibold text-slate-300">Asset ID audio</label>
           <textarea className={`${field} min-h-32 resize-y`} value={pastedIds} onChange={event => setPastedIds(event.target.value)} placeholder="Paste ID atau link audio dari Development Items. Pisahkan dengan baris baru, koma, atau spasi." />
-          <p className="mt-2 text-xs text-slate-500">Roblox belum menyediakan daftar lengkap audio grup lewat API key. Salin ID dari Development Items, atau pilih audio yang pernah diupload lewat Disperser di bawah.</p>
+          <p className="mt-2 text-xs text-slate-500">Salin ID dari Development Items milik sumber yang dipilih, atau pilih audio yang pernah diupload lewat Disperser di bawah.</p>
         </section>
 
         <section className={card}>
           <div className="mb-4 flex items-center gap-2 text-white"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-500/20 text-sm font-bold text-indigo-300">2</span><h2 className="font-bold">Tentukan tujuan</h2></div>
-          <label className="mb-1 block text-xs font-semibold text-slate-300">Group ID Community B</label>
+          <label className="mb-1 block text-xs font-semibold text-slate-300">Group ID Community B <span className="font-normal text-slate-500">(opsional)</span></label>
           <input className={field} inputMode="numeric" value={targetGroupId} onChange={event => setTargetGroupId(event.target.value)} placeholder="Community yang diberi akses" />
           <label className="mb-1 mt-4 block text-xs font-semibold text-slate-300">Universe ID experience B <span className="font-normal text-slate-500">(opsional)</span></label>
           <input className={field} inputMode="numeric" value={targetUniverseId} onChange={event => setTargetUniverseId(event.target.value)} placeholder="Agar audio dapat diputar dalam experience" />
-          <p className="mt-2 text-xs text-slate-500">Izin ke Community B membantu kolaborator menggunakan audio. Jika audio dipakai di game, isi Universe ID agar experience juga mendapat izin pakai.</p>
-          <div className="mt-5 flex items-center gap-3 rounded-xl bg-cyan-500/10 px-4 py-3 text-xs text-cyan-200"><Music2 size={18} className="shrink-0" /> Backend memeriksa jenis Audio dan pemilik Community A sebelum membagikan tiap ID.</div>
+          <p className="mt-2 text-xs text-slate-500">Isi minimal salah satu tujuan. Untuk experience milik akun personal, cukup isi Universe ID tanpa Group ID.</p>
+          <div className="mt-5 flex items-center gap-3 rounded-xl bg-cyan-500/10 px-4 py-3 text-xs text-cyan-200"><Music2 size={18} className="shrink-0" /> Backend memeriksa jenis Audio dan pemilik asal sebelum membagikan tiap ID.</div>
         </section>
       </div>
 

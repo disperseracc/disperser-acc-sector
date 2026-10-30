@@ -5,6 +5,7 @@ const MAX_ASSETS = 100;
 const BATCH_SIZE = 50;
 
 type GrantTarget = 'Group' | 'Universe';
+type SourceType = 'Group' | 'User';
 type AssetResult = { assetId: string; status: 'success' | 'error'; error?: string };
 
 function positiveId(value: unknown): string | null {
@@ -32,15 +33,17 @@ export function createAssetSharingRouter() {
 
   router.post('/grant', async (req, res) => {
     const apiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
-    const sourceGroupId = positiveId(req.body?.sourceGroupId);
+    const sourceType: SourceType | null = req.body?.sourceType === 'User' ? 'User'
+      : req.body?.sourceType === 'Group' || req.body?.sourceType === undefined ? 'Group' : null;
+    const sourceId = positiveId(req.body?.sourceId ?? (sourceType === 'Group' ? req.body?.sourceGroupId : null));
     const targetType: GrantTarget | null = req.body?.targetType === 'Group' || req.body?.targetType === 'Universe'
       ? req.body.targetType : null;
     const targetId = positiveId(req.body?.targetId);
     const rawIds = req.body?.assetIds;
-    if (!apiKey || !sourceGroupId || !targetType || !targetId || !Array.isArray(rawIds)) {
-      return res.status(400).json({ error: 'API key, Community A, tujuan, dan daftar Asset ID wajib diisi.' });
+    if (!apiKey || !sourceType || !sourceId || !targetType || !targetId || !Array.isArray(rawIds)) {
+      return res.status(400).json({ error: 'API key, pemilik audio asal, tujuan, dan daftar Asset ID wajib diisi.' });
     }
-    if (targetType === 'Group' && targetId === sourceGroupId) {
+    if (sourceType === 'Group' && targetType === 'Group' && targetId === sourceId) {
       return res.status(400).json({ error: 'Community tujuan harus berbeda dari Community asal.' });
     }
     if (rawIds.length < 1 || rawIds.length > MAX_ASSETS) {
@@ -61,9 +64,11 @@ export function createAssetSharingRouter() {
             const result = await robloxJson(`${ROBLOX_API}/assets/v1/assets/${assetId}`, apiKey);
             if (!result.ok) return { assetId, error: robloxError(result.data, result.status) };
             const asset = result.data;
-            if (asset.assetType !== 'Audio') return { assetId, error: 'Asset ini bukan Audio.' };
-            if (String(asset.creationContext?.creator?.groupId ?? '') !== sourceGroupId) {
-              return { assetId, error: 'Audio bukan milik Community A.' };
+            if (asset.assetType !== 'Audio' && asset.assetType !== 'ASSET_TYPE_AUDIO') return { assetId, error: 'Asset ini bukan Audio.' };
+            const creatorId = sourceType === 'Group'
+              ? asset.creationContext?.creator?.groupId : asset.creationContext?.creator?.userId;
+            if (String(creatorId ?? '') !== sourceId) {
+              return { assetId, error: `Audio bukan milik ${sourceType === 'Group' ? 'Community' : 'akun personal'} asal.` };
             }
             return { assetId };
           } catch (error: any) {
