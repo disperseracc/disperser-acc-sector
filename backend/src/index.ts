@@ -17,6 +17,7 @@ global.WebSocket = ws;
 import { initBot, getBotClient } from './bot';
 import { createBackupRouter } from './backup/router';
 import { createAssetSharingRouter } from './assetSharing';
+import { validateRobloxKey } from './robloxKeyValidation';
 
 // Trys multiple prospective paths for the .env file to be robust against execution directory
 const envPaths = [
@@ -469,45 +470,8 @@ app.post('/api/payment/duitku-callback', async (req, res) => {
 
 // --- Roblox Key Validation ---
 app.post('/api/roblox/validate-key', async (req, res) => {
-  const { apiKey } = req.body;
-
-  if (!apiKey) {
-    return res.status(400).json({ success: false, error: 'API Key is required' });
-  }
-
-  try {
-    // Try to get a specific asset metadata. ID '1' is used as a test.
-    // This endpoint is guaranteed to check the API Key first.
-    const response = await fetch('https://apis.roblox.com/assets/v1/assets/1', {
-      method: 'GET',
-      headers: { 'x-api-key': apiKey }
-    });
-
-    if (response.status === 401) {
-      return res.status(401).json({ success: false, error: 'Invalid API Key (Unauthorized)' });
-    }
-
-    if (response.status === 403) {
-      const data = await response.json().catch(() => ({}));
-      return res.status(403).json({
-        success: false,
-        error: data.message || 'Access Forbidden: Ensure your IP is whitelisted and Assets API (Read) permission is added.'
-      });
-    }
-
-    // If we get 200 (Asset found) or 404 (Asset not found), the key is AUTHENTICATED.
-    // 404 here means the path is valid but the specific asset 1 is not in the creator's scope or doesn't exist.
-    // But importantly, 404 on this path ONLY happens if the key passed authentication.
-    if (!response.ok && response.status !== 404) {
-      const data = await response.json().catch(() => ({}));
-      return res.status(response.status).json({ success: false, error: data.message || `Roblox API Error: ${response.status}` });
-    }
-
-    res.json({ success: true, message: 'API Key is valid and authenticated' });
-  } catch (error: any) {
-    console.error('Key validation error:', error);
-    res.status(500).json({ success: false, error: 'Server error during validation' });
-  }
+  const result = await validateRobloxKey(req.body?.apiKey);
+  res.status(result.status).json(result.body);
 });
 
 // --- Roblox API Endpoints ---

@@ -10,6 +10,14 @@ import { Helmet } from 'react-helmet-async';
 import { BASE_URL } from '@/api/api';
 import { useConfigStore } from '@/store/useConfigStore';
 
+function cloudSaveWarning(detail: string): string {
+  const authenticationError = /not auth|unauthori[sz]ed|jwt|permission denied|row.level.security|42501/i.test(detail);
+  const reason = authenticationError
+    ? 'Supabase menolak penyimpanan akun. Login Discord di web belum menjadi sesi autentikasi Supabase; periksa akses tabel users atau alur login Supabase.'
+    : 'Supabase tidak berhasil menyimpan pengaturan ke akunmu. Periksa koneksi atau konfigurasi tabel users.';
+  return `API key valid dan tersimpan di browser ini, tetapi belum tersinkron ke akun. ${reason} Detail: ${detail}`;
+}
+
 export default function Settings() {
   const { setConfig, uploadTarget, setUploadTarget } = useConfigStore();
   const [userId, setUserId] = useState(localStorage.getItem('disperser_user_id') || '');
@@ -17,7 +25,7 @@ export default function Settings() {
   const [apiKey, setApiKey] = useState(localStorage.getItem('disperser_key') || '');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'success' | 'warning' | 'error'>('idle');
   const [statusMsg, setStatusMsg] = useState('');
 
 
@@ -60,29 +68,36 @@ export default function Settings() {
     setStatusMsg('');
     try {
       const storedUser = localStorage.getItem('disperser_user');
-      if (!storedUser) throw new Error('Not logged in');
-
-      const { id } = JSON.parse(storedUser);
+      if (!storedUser) throw new Error('Sesi Discord di web tidak ditemukan. Masuk ulang ke Disperser lalu coba simpan lagi.');
+      let id: string | undefined;
+      try { id = String(JSON.parse(storedUser).id || ''); } catch { /* handled below */ }
+      if (!id) throw new Error('Data login Discord di browser rusak. Keluar lalu masuk ulang ke Disperser.');
+      if (!apiKey.trim()) throw new Error('Isi Roblox Open Cloud API key terlebih dahulu.');
 
       // 1. Validate API Key with Backend first
-      const validationRes = await fetch(`${BASE_URL}/api/roblox/validate-key`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey })
-      });
-
-      const contentType = validationRes.headers.get('content-type');
-      let validationData;
-
-      if (contentType && contentType.includes('application/json')) {
-        validationData = await validationRes.json();
-      } else {
-        const text = await validationRes.text();
-        throw new Error(`Roblox key validation failed (Server Error)`);
+      let validationRes: Response;
+      try {
+        validationRes = await fetch(`${BASE_URL}/api/roblox/validate-key`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey: apiKey.trim() })
+        });
+      } catch {
+        throw new Error('Server Disperser tidak dapat dihubungi untuk memeriksa API key. Periksa koneksi internet atau status backend.');
       }
 
-      if (!validationRes.ok) {
-        throw new Error(validationData.error || 'Roblox API validation failed');
+      const contentType = validationRes.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        throw new Error(`Server Disperser memberi respons yang tidak sesuai saat validasi API key (HTTP ${validationRes.status}).`);
+      }
+      const validationData = await validationRes.json().catch(() => null);
+      if (!validationData || typeof validationData !== 'object') {
+        throw new Error(`Respons validasi API key dari server Disperser tidak dapat dibaca (HTTP ${validationRes.status}).`);
+      }
+      if (!validationRes.ok || validationData.success !== true) {
+        const reason = String(validationData.error || `Roblox menolak API key (HTTP ${validationRes.status}).`);
+        const detail = validationData.detail ? ` Respons Roblox: ${validationData.detail}` : '';
+        throw new Error(`Validasi Roblox gagal (HTTP ${validationRes.status}): ${reason}${detail} Ini terkait API key Roblox, bukan login Discord.`);
       }
 
       // 2. Update Supabase
@@ -92,31 +107,36 @@ export default function Settings() {
       };
       if (groupId !== undefined) updatePayload.roblox_group_id = groupId;
 
-      const { error } = await supabase
-        .from('users')
-        .update(updatePayload)
-        .eq('id', id);
-
-      if (error) {
-        console.warn('Supabase update warning (roblox_group_id column might not exist):', error.message);
+      let cloudError = '';
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .update(updatePayload)
+          .eq('id', id)
+          .select('id')
+          .maybeSingle();
+        if (error) cloudError = error.message;
+        else if (!data) cloudError = 'Baris akun tidak ditemukan atau tidak dapat diubah dengan izin saat ini.';
+      } catch (error: any) {
+        cloudError = error?.message || 'Koneksi ke Supabase gagal.';
       }
 
       // Update LocalStorage for quick access in API calls
       localStorage.setItem('disperser_user_id', userId);
       localStorage.setItem('disperser_group_id', groupId);
-      localStorage.setItem('disperser_key', apiKey);
+      localStorage.setItem('disperser_key', apiKey.trim());
 
       // Update global context state
-      setConfig(userId, groupId, apiKey);
+      setConfig(userId, groupId, apiKey.trim());
 
       setSaved(true);
-      setStatus('success');
-      setStatusMsg('Credentials validated and saved successfully!');
+      setStatus(cloudError ? 'warning' : 'success');
+      setStatusMsg(cloudError ? cloudSaveWarning(cloudError) : 'API key Roblox valid. Pengaturan tersimpan di browser dan akun Disperser.');
       setTimeout(() => setSaved(false), 3000);
     } catch (e: any) {
       console.error('Save failed:', e);
       setStatus('error');
-      setStatusMsg(e.message);
+      setStatusMsg(e?.message || 'Pengaturan gagal disimpan. Coba lagi.');
     } finally {
       setLoading(false);
     }
@@ -246,11 +266,13 @@ export default function Settings() {
               {status !== 'idle' && (
                 <div className={`p-4 rounded-2xl border animate-in fade-in slide-in-from-top-2 duration-300 ${status === 'success'
                   ? 'glass-panel bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                  : 'glass-panel bg-red-500/10 border-red-500/30 text-red-300'
+                  : status === 'warning'
+                    ? 'glass-panel bg-amber-500/10 border-amber-500/30 text-amber-200'
+                    : 'glass-panel bg-red-500/10 border-red-500/30 text-red-300'
                   }`}>
                   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
-                    {status === 'success' ? <CheckCircle size={16} className="text-emerald-400" /> : <AlertCircle size={16} className="text-red-400" />}
-                    {status === 'success' ? 'Validation Passed' : 'Validation Error'}
+                    {status === 'success' ? <CheckCircle size={16} className="text-emerald-400" /> : <AlertCircle size={16} className={status === 'warning' ? 'text-amber-300' : 'text-red-400'} />}
+                    {status === 'success' ? 'Tersimpan di browser dan akun' : status === 'warning' ? 'Hanya tersimpan di browser' : 'Pengaturan gagal disimpan'}
                   </div>
                   <p className="text-xs mt-1 leading-relaxed opacity-90">{statusMsg}</p>
                 </div>
@@ -262,7 +284,7 @@ export default function Settings() {
                 className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold h-12 rounded-2xl shadow-lg shadow-cyan-500/25 gap-2.5 transition-all cursor-pointer hover:scale-[1.01] active:scale-[0.99] text-sm"
               >
                 {loading ? <Loader2 className="animate-spin" size={18} /> : (saved ? <CheckCircle size={18} /> : <Save size={18} />)}
-                {loading ? 'Validating & Saving...' : (saved ? 'Credentials Verified & Saved!' : 'Save Credentials')}
+                {loading ? 'Memeriksa dan menyimpan...' : (saved ? 'API key valid dan tersimpan' : 'Simpan kredensial')}
               </Button>
             </CardContent>
           </Card>
@@ -278,7 +300,7 @@ export default function Settings() {
             </CardHeader>
             <CardContent className="p-6 md:p-8 pt-2">
               <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-                Your credentials are encrypted and stored safely in your browser's local storage and only transmitted to your local backend server to communicate securely with official Roblox Open Cloud endpoints.
+                API key disimpan di penyimpanan browser ini dan dikirim ke backend Disperser untuk berkomunikasi dengan Roblox Open Cloud. Jangan gunakan key di browser bersama.
               </p>
               <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/[0.06]">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-2">Required API Permissions</h4>
