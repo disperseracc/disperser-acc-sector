@@ -60,16 +60,21 @@ export async function validateRobloxKey(apiKey: unknown, target: KeyTarget = {},
   if (!Array.isArray(data?.scopes)) {
     return { status: 502, body: { success: false, code: 'ROBLOX_RESPONSE_INVALID', error: 'Roblox tidak mengirim rincian izin API key. Coba validasi lagi beberapa saat.' } };
   }
-  if (!data.scopes.some((scope: any) => hasAssetOperation(scope, 'read'))
-    || !data.scopes.some((scope: any) => hasAssetOperation(scope, 'write'))) {
-    return { status: 403, body: { success: false, code: 'ASSET_SCOPE_MISSING', error: 'API key terbaca, tetapi izin Assets API Read dan Write belum lengkap. Tambahkan keduanya pada key di Roblox Creator Dashboard.' } };
+  const hasAssetRead = data.scopes.some((scope: any) => hasAssetOperation(scope, 'read'));
+  const hasAssetWrite = data.scopes.some((scope: any) => hasAssetOperation(scope, 'write'));
+  const hasDatastoreScope = data.scopes.some((scope: any) =>
+    /^(universe-datastores\.|universe\.ordered-data-store\.)/.test(String(scope?.name ?? '')));
+
+  if (!hasAssetRead || !hasAssetWrite) {
+    const datastoreNote = hasDatastoreScope ? 'Scope DataStore/OrderedDataStore terdeteksi. ' : '';
+    return { status: 200, body: { success: true, code: 'KEY_VALID_LIMITED', message: `API key aktif. ${datastoreNote}Upload audio memerlukan Assets API Read dan Write; Sharing Asset juga memerlukan Asset Permissions Write.` } };
   }
   if (target.uploadTarget === 'group') {
     const groupAllowed = (operation: 'read' | 'write') => data.scopes.some((scope: any) =>
       hasAssetOperation(scope, operation) && Array.isArray(scope.groupIds)
       && scope.groupIds.some((id: unknown) => String(id) === '*' || String(id) === selectedGroupId));
     if (!groupAllowed('read') || !groupAllowed('write')) {
-      return { status: 403, body: { success: false, code: 'GROUP_ASSET_ACCESS_MISSING', error: `API key aktif, tetapi izin Assets API Read/Write tidak mencakup Group ID ${selectedGroupId}. Tambahkan grup ini pada target Creator di API key, lalu pastikan akun pembuat key punya izin aset pada grup tersebut.` } };
+      return { status: 200, body: { success: true, code: 'KEY_VALID_LIMITED', message: `API key aktif, tetapi izin Assets API Read/Write tidak mencakup Group ID ${selectedGroupId}. Upload ke grup ini memerlukan target Creator dan izin aset untuk grup tersebut.` } };
     }
   }
   return { status: 200, body: { success: true, code: 'KEY_VALID', message: 'API key aktif dan izin Assets API Read/Write tersedia.' } };

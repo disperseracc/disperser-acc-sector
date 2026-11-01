@@ -25,7 +25,7 @@ export default function Settings() {
   const [apiKey, setApiKey] = useState(localStorage.getItem('disperser_key') || '');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'success' | 'warning' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'success' | 'limited' | 'warning' | 'error'>('idle');
   const [statusMsg, setStatusMsg] = useState('');
 
 
@@ -130,8 +130,11 @@ export default function Settings() {
       setConfig(userId, groupId, apiKey.trim());
 
       setSaved(true);
-      setStatus(cloudError ? 'warning' : 'success');
-      setStatusMsg(cloudError ? cloudSaveWarning(cloudError) : 'API key Roblox valid. Pengaturan tersimpan di browser dan akun Disperser.');
+      setStatus(cloudError ? 'warning' : validationData.code === 'KEY_VALID_LIMITED' ? 'limited' : 'success');
+      const keyMessage = String(validationData.message || 'API key Roblox valid.');
+      setStatusMsg(cloudError
+        ? `${cloudSaveWarning(cloudError)} ${keyMessage}`
+        : `${keyMessage} Pengaturan tersimpan di browser dan akun Disperser.`);
       setTimeout(() => setSaved(false), 3000);
     } catch (e: any) {
       console.error('Save failed:', e);
@@ -173,7 +176,7 @@ export default function Settings() {
                 Roblox Authentication
               </CardTitle>
               <CardDescription className="text-slate-400 text-sm mt-1">
-                These credentials are required to interact with the Roblox Open Cloud API for asset uploads & studio synchronization.
+                Gunakan API key Roblox Open Cloud sesuai fitur yang kamu pakai: upload aset, Sharing Asset, atau Backup Server.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6 md:p-8 pt-2 space-y-6">
@@ -260,19 +263,19 @@ export default function Settings() {
                   onChange={(e) => setApiKey(e.target.value)}
                   className="bg-slate-950/60 border-white/[0.08] text-white text-sm font-mono rounded-xl placeholder:text-slate-600 focus-visible:ring-cyan-500/40 h-11"
                 />
-                <p className="text-xs text-slate-400">Upload: Assets API (Read & Write). Sharing Asset: tambah scope <span className="font-mono text-cyan-300">asset-permissions:write</span>.</p>
+                <p className="text-xs text-slate-400">Key khusus DataStore juga bisa disimpan. Upload memerlukan Assets API (Read & Write); Sharing Asset memerlukan <span className="font-mono text-cyan-300">asset-permissions:write</span>.</p>
               </div>
 
               {status !== 'idle' && (
                 <div className={`p-4 rounded-2xl border animate-in fade-in slide-in-from-top-2 duration-300 ${status === 'success'
                   ? 'glass-panel bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                  : status === 'warning'
+                  : status === 'warning' || status === 'limited'
                     ? 'glass-panel bg-amber-500/10 border-amber-500/30 text-amber-200'
                     : 'glass-panel bg-red-500/10 border-red-500/30 text-red-300'
                   }`}>
                   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
                     {status === 'success' ? <CheckCircle size={16} className="text-emerald-400" /> : <AlertCircle size={16} className={status === 'warning' ? 'text-amber-300' : 'text-red-400'} />}
-                    {status === 'success' ? 'Tersimpan di browser dan akun' : status === 'warning' ? 'Hanya tersimpan di browser' : 'Pengaturan gagal disimpan'}
+                    {status === 'success' ? 'Tersimpan di browser dan akun' : status === 'limited' ? 'Tersimpan, izin terbatas' : status === 'warning' ? 'Hanya tersimpan di browser' : 'Pengaturan gagal disimpan'}
                   </div>
                   <p className="text-xs mt-1 leading-relaxed opacity-90">{statusMsg}</p>
                 </div>
@@ -303,19 +306,19 @@ export default function Settings() {
                 API key disimpan di penyimpanan browser ini dan dikirim ke backend Disperser untuk berkomunikasi dengan Roblox Open Cloud. Jangan gunakan key di browser bersama.
               </p>
               <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/[0.06]">
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-2">Required API Permissions</h4>
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-2">Izin API sesuai fitur</h4>
                 <ul className="text-xs text-slate-400 space-y-2">
                   <li className="flex items-start gap-2.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
-                    <span><strong className="text-slate-200">Assets API</strong> (Read & Write) — Required for uploading audio assets and tracking moderation status.</span>
+                    <span><strong className="text-slate-200">Upload audio:</strong> Assets API (Read & Write) untuk mengunggah aset dan memantau moderasi.</span>
                   </li>
                   <li className="flex items-start gap-2.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
-                    <span><strong className="text-slate-200">asset-permissions:write</strong> — Required for Sharing Asset between communities and experiences.</span>
+                    <span><strong className="text-slate-200">Sharing Asset:</strong> asset-permissions:write untuk membagikan aset ke komunitas atau experience lain.</span>
                   </li>
                   <li className="flex items-start gap-2.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
-                    <span><strong className="text-slate-200">DataStore API</strong> (Read & Write) — Optional, used if accessing DataStore snapshots on Backup Server.</span>
+                    <span><strong className="text-slate-200">Backup Server:</strong> izin DataStore dan OrderedDataStore untuk universe yang dicadangkan atau dipulihkan.</span>
                   </li>
                 </ul>
               </div>
@@ -346,9 +349,9 @@ export default function Settings() {
                 <li>
                   In <span className="text-white font-semibold">API Permissions</span>, add:
                   <ul className="list-disc list-inside ml-4 mt-1.5 text-xs text-slate-400 space-y-1">
-                    <li>Assets API (Read & Write)</li>
-                    <li>Asset Permissions (Write) untuk Sharing Asset</li>
-                    <li>Ordered DataStore (Optional)</li>
+                    <li>Upload audio: Assets API (Read & Write)</li>
+                    <li>Sharing Asset: Asset Permissions (Write)</li>
+                    <li>Backup Server: DataStore dan Ordered DataStore untuk universe terkait</li>
                   </ul>
                 </li>
                 <li>Copy the generated key and paste it into the field on the left!</li>

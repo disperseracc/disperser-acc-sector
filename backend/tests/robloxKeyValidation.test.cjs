@@ -31,23 +31,28 @@ test('explains rejected and expired keys without leaking the key', async () => {
   assert.equal(expired.body.code, 'KEY_EXPIRED');
 });
 
-test('identifies missing asset permissions separately from authentication', async () => {
-  const result = await validateRobloxKey('test-key', {}, mockResponse(200, {
-    enabled: true, expired: false, scopes: [{ name: 'asset', operations: ['read'] }],
+test('accepts a datastore-only key and explains the unavailable asset features', async () => {
+  const result = await validateRobloxKey('test-key', { uploadTarget: 'group', groupId: '526640214' }, mockResponse(200, {
+    enabled: true, expired: false, scopes: [
+      { name: 'universe-datastores.objects', operations: ['read', 'update'], universeDatastores: [{ universeId: '10773757082' }] },
+      { name: 'universe.ordered-data-store.scope.entry', operations: ['read', 'write'], universeIds: ['10773757082'] },
+    ],
   }));
-  assert.equal(result.status, 403);
-  assert.equal(result.body.code, 'ASSET_SCOPE_MISSING');
+  assert.equal(result.status, 200);
+  assert.equal(result.body.code, 'KEY_VALID_LIMITED');
+  assert.match(result.body.message, /DataStore\/OrderedDataStore/);
+  assert.match(result.body.message, /Assets API Read dan Write/);
 });
 
-test('identifies a key scoped to another group before claiming Settings were saved', async () => {
+test('reports asset access limited to another group without rejecting the valid key', async () => {
   const response = mockResponse(200, {
     enabled: true, expired: false,
     scopes: [{ name: 'asset', operations: ['read', 'write'], groupIds: ['123'] }],
   });
   const wrongGroup = await validateRobloxKey('test-key', { uploadTarget: 'group', groupId: '456' }, response);
-  assert.equal(wrongGroup.status, 403);
-  assert.equal(wrongGroup.body.code, 'GROUP_ASSET_ACCESS_MISSING');
-  assert.match(wrongGroup.body.error, /456/);
+  assert.equal(wrongGroup.status, 200);
+  assert.equal(wrongGroup.body.code, 'KEY_VALID_LIMITED');
+  assert.match(wrongGroup.body.message, /456/);
 
   const allowedGroup = await validateRobloxKey('test-key', { uploadTarget: 'group', groupId: '123' }, response);
   assert.equal(allowedGroup.body.code, 'KEY_VALID');
