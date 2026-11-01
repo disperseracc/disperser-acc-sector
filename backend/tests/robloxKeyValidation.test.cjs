@@ -12,7 +12,7 @@ function mockResponse(status, body) {
 }
 
 test('reports a valid key with asset read and write permissions', async () => {
-  const result = await validateRobloxKey('test-key', mockResponse(200, {
+  const result = await validateRobloxKey('test-key', {}, mockResponse(200, {
     enabled: true, expired: false, scopes: [{ name: 'asset', operations: ['read', 'write'] }],
   }));
   assert.equal(result.status, 200);
@@ -20,21 +20,35 @@ test('reports a valid key with asset read and write permissions', async () => {
 });
 
 test('explains rejected and expired keys without leaking the key', async () => {
-  const rejected = await validateRobloxKey('test-key', mockResponse(403, { message: 'User not authenticated: test-key' }));
+  const rejected = await validateRobloxKey('test-key', {}, mockResponse(403, { message: 'User not authenticated: test-key' }));
   assert.equal(rejected.body.code, 'ROBLOX_KEY_REJECTED');
   assert.match(rejected.body.error, /server Disperser/);
   assert.equal(rejected.body.detail, 'User not authenticated: [redacted]');
 
-  const expired = await validateRobloxKey('test-key', mockResponse(200, {
+  const expired = await validateRobloxKey('test-key', {}, mockResponse(200, {
     enabled: true, expired: true, scopes: [{ name: 'asset', operations: ['read', 'write'] }],
   }));
   assert.equal(expired.body.code, 'KEY_EXPIRED');
 });
 
 test('identifies missing asset permissions separately from authentication', async () => {
-  const result = await validateRobloxKey('test-key', mockResponse(200, {
+  const result = await validateRobloxKey('test-key', {}, mockResponse(200, {
     enabled: true, expired: false, scopes: [{ name: 'asset', operations: ['read'] }],
   }));
   assert.equal(result.status, 403);
   assert.equal(result.body.code, 'ASSET_SCOPE_MISSING');
+});
+
+test('identifies a key scoped to another group before claiming Settings were saved', async () => {
+  const response = mockResponse(200, {
+    enabled: true, expired: false,
+    scopes: [{ name: 'asset', operations: ['read', 'write'], groupIds: ['123'] }],
+  });
+  const wrongGroup = await validateRobloxKey('test-key', { uploadTarget: 'group', groupId: '456' }, response);
+  assert.equal(wrongGroup.status, 403);
+  assert.equal(wrongGroup.body.code, 'GROUP_ASSET_ACCESS_MISSING');
+  assert.match(wrongGroup.body.error, /456/);
+
+  const allowedGroup = await validateRobloxKey('test-key', { uploadTarget: 'group', groupId: '123' }, response);
+  assert.equal(allowedGroup.body.code, 'KEY_VALID');
 });

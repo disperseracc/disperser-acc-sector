@@ -80,7 +80,7 @@ export default function Settings() {
         validationRes = await fetch(`${BASE_URL}/api/roblox/validate-key`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ apiKey: apiKey.trim() })
+          body: JSON.stringify({ apiKey: apiKey.trim(), uploadTarget, groupId: groupId.trim() })
         });
       } catch {
         throw new Error('Server Disperser tidak dapat dihubungi untuk memeriksa API key. Periksa koneksi internet atau status backend.');

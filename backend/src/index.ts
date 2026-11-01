@@ -470,7 +470,10 @@ app.post('/api/payment/duitku-callback', async (req, res) => {
 
 // --- Roblox Key Validation ---
 app.post('/api/roblox/validate-key', async (req, res) => {
-  const result = await validateRobloxKey(req.body?.apiKey);
+  const result = await validateRobloxKey(req.body?.apiKey, {
+    uploadTarget: req.body?.uploadTarget,
+    groupId: req.body?.groupId,
+  });
   res.status(result.status).json(result.body);
 });
 

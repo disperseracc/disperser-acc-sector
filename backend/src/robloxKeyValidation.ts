@@ -7,25 +7,27 @@ type ValidationBody = {
 };
 
 export type KeyValidationResult = { status: number; body: ValidationBody };
+type KeyTarget = { uploadTarget?: unknown; groupId?: unknown };
 
 function robloxMessage(data: any): string | undefined {
   const value = data?.error?.message ?? data?.error ?? data?.message ?? data?.errors?.[0]?.message;
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
-function hasAssetOperation(scopes: any, operation: 'read' | 'write'): boolean {
-  if (!Array.isArray(scopes)) return false;
-  return scopes.some((scope: any) => {
-    const name = String(scope?.name ?? '').toLowerCase();
-    if (name === `asset:${operation}`) return true;
-    return name === 'asset' && Array.isArray(scope?.operations)
-      && scope.operations.some((value: unknown) => String(value).toLowerCase() === operation);
-  });
+function hasAssetOperation(scope: any, operation: 'read' | 'write'): boolean {
+  const name = String(scope?.name ?? '').toLowerCase();
+  if (name === `asset:${operation}`) return true;
+  return name === 'asset' && Array.isArray(scope?.operations)
+    && scope.operations.some((value: unknown) => String(value).toLowerCase() === operation);
 }
 
-export async function validateRobloxKey(apiKey: unknown, fetcher: typeof fetch = fetch): Promise<KeyValidationResult> {
+export async function validateRobloxKey(apiKey: unknown, target: KeyTarget = {}, fetcher: typeof fetch = fetch): Promise<KeyValidationResult> {
   if (typeof apiKey !== 'string' || !apiKey.trim()) {
     return { status: 400, body: { success: false, code: 'KEY_REQUIRED', error: 'Isi Roblox Open Cloud API key terlebih dahulu.' } };
+  }
+  const selectedGroupId = String(target.groupId ?? '').trim();
+  if (target.uploadTarget === 'group' && !/^[1-9]\d*$/.test(selectedGroupId)) {
+    return { status: 400, body: { success: false, code: 'GROUP_ID_REQUIRED', error: 'Mode Group dipilih. Isi Group ID Roblox yang valid sebelum menyimpan.' } };
   }
 
   let response: Response;
@@ -58,8 +60,17 @@ export async function validateRobloxKey(apiKey: unknown, fetcher: typeof fetch =
   if (!Array.isArray(data?.scopes)) {
     return { status: 502, body: { success: false, code: 'ROBLOX_RESPONSE_INVALID', error: 'Roblox tidak mengirim rincian izin API key. Coba validasi lagi beberapa saat.' } };
   }
-  if (!hasAssetOperation(data?.scopes, 'read') || !hasAssetOperation(data?.scopes, 'write')) {
+  if (!data.scopes.some((scope: any) => hasAssetOperation(scope, 'read'))
+    || !data.scopes.some((scope: any) => hasAssetOperation(scope, 'write'))) {
     return { status: 403, body: { success: false, code: 'ASSET_SCOPE_MISSING', error: 'API key terbaca, tetapi izin Assets API Read dan Write belum lengkap. Tambahkan keduanya pada key di Roblox Creator Dashboard.' } };
+  }
+  if (target.uploadTarget === 'group') {
+    const groupAllowed = (operation: 'read' | 'write') => data.scopes.some((scope: any) =>
+      hasAssetOperation(scope, operation) && Array.isArray(scope.groupIds)
+      && scope.groupIds.some((id: unknown) => String(id) === '*' || String(id) === selectedGroupId));
+    if (!groupAllowed('read') || !groupAllowed('write')) {
+      return { status: 403, body: { success: false, code: 'GROUP_ASSET_ACCESS_MISSING', error: `API key aktif, tetapi izin Assets API Read/Write tidak mencakup Group ID ${selectedGroupId}. Tambahkan grup ini pada target Creator di API key, lalu pastikan akun pembuat key punya izin aset pada grup tersebut.` } };
+    }
   }
   return { status: 200, body: { success: true, code: 'KEY_VALID', message: 'API key aktif dan izin Assets API Read/Write tersedia.' } };
 }
