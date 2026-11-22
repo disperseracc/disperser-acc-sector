@@ -8,6 +8,7 @@ import AudioStudio from './pages/AudioStudio';
 import AudioLibrary from './pages/AudioLibrary';
 import BackupServer from './pages/BackupServer';
 import SharingAsset from './pages/SharingAsset';
+import Spritesheet from './pages/Spritesheet';
 import { PollProvider } from './context/PollContext';
 import { BulkUploadProvider, useBulkUpload } from './context/BulkUploadContext';
 import DiscordCallback from './pages/DiscordCallback';
@@ -26,7 +27,8 @@ import {
   Menu,
   X as CloseIcon,
   Database,
-  Share2
+  Share2,
+  Grid3X3
 } from 'lucide-react';
 
 // --- Components ---
@@ -48,6 +50,7 @@ const Sidebar = ({ open, setOpen }: { open: boolean; setOpen: (o: boolean) => vo
     { name: 'Sharing Asset', path: '/dashboard/sharing', icon: <Share2 size={18} /> },
     { name: 'Backup Server', path: '/dashboard/backup', icon: <Database size={18} /> },
     { name: 'Upload Image', path: '/dashboard/image', icon: <ImageIcon size={18} /> },
+    { name: 'MP4 to Spritesheet', path: '/dashboard/spritesheet', icon: <Grid3X3 size={18} /> },
     { name: 'Settings', path: '/dashboard/settings', icon: <SettingsIcon size={18} /> },
   ];
 
@@ -306,6 +309,7 @@ const DashboardLayout = ({ userExists }: { userExists: boolean }) => {
               <Route path="/sharing" element={<SharingAsset />} />
               <Route path="/backup" element={<BackupServer />} />
               <Route path="/image" element={<UploadImage />} />
+              <Route path="/spritesheet" element={<Spritesheet />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
