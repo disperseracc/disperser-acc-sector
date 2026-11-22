@@ -269,9 +269,11 @@ export default function Spritesheet() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 id="spritesheet-result" className="text-lg font-bold text-white">Hasil spritesheet</h2>
-              <p className="mt-1 text-sm text-slate-300" role="status">
-                {result.plan.frameCount} frame · {result.plan.fps} FPS · {result.pages.length} PNG
-              </p>
+              {result.pages.length > 1 && (
+                <p className="mt-1 text-sm text-slate-300" role="status">
+                  {result.plan.frameCount} frame total · {result.pages.length} PNG
+                </p>
+              )}
             </div>
             <Button type="button" variant="outline" onClick={downloadMetadata}><Download aria-hidden="true" /> Unduh JSON</Button>
           </div>
@@ -287,7 +289,26 @@ export default function Spritesheet() {
             <Button type="button" className={primaryButton} onClick={() => download(page.blob, page.file)}>
               <Download aria-hidden="true" /> Unduh PNG
             </Button>
-            <span className="text-sm text-slate-300">{page.width} × {page.height} px · {page.columns} kolom · {page.rows} baris</span>
+            <span className="text-sm text-slate-300">{page.width} × {page.height} px · {page.rows} baris</span>
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-slate-200">Analisis hasil</h3>
+            <dl className="grid grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-2" aria-live="polite">
+              <div className="rounded-xl border border-white/10 bg-slate-950/60 p-3">
+                <dt className="text-xs text-slate-300">FPS output</dt>
+                <dd className="mt-1 font-mono text-lg font-bold text-cyan-200">{result.plan.fps}</dd>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-slate-950/60 p-3">
+                <dt className="font-mono text-xs text-slate-300">framesPerRow</dt>
+                <dd className="mt-1 font-mono text-lg font-bold text-cyan-200">{page.columns}</dd>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-slate-950/60 p-3">
+                <dt className="text-xs text-slate-300">
+                  <code>frames</code>{result.pages.length > 1 && ' (lembar ini)'}
+                </dt>
+                <dd className="mt-1 font-mono text-lg font-bold text-cyan-200">{page.frameCount}</dd>
+              </div>
+            </dl>
           </div>
           <img
             ref={attachImage}
